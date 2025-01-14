@@ -1,107 +1,43 @@
 import hoomd
 import hoomd.hpmc
+import gsd.hoomd
 import numpy as np
 import math
-
-### Start Rendering function, this is all taken straight from the HOOMD tutorials on github:
-# https://github.com/glotzerlab/hoomd-examples/blob/6b0277796902a9b540ae399b4c2d2219456492ff/00-Introducing-HOOMD-blue/03-Initializing-the-System-State.ipynb
-import warnings
-import fresnel
-import packaging.version
-
-# Set CPU for graphing snapshot 
-fresnelDevice = fresnel.Device()
-tracer = fresnel.tracer.Path(device=fresnelDevice, w=300, h=300)
-
-FRESNEL_MIN_VERSION = packaging.version.parse('0.13.0')
-FRESNEL_MAX_VERSION = packaging.version.parse('0.14.0')
-
-
-def render(snapshot, vertices, fName):
-    if ('version' not in dir(fresnel) 
-        or packaging.version.parse(fresnel.version.version) < FRESNEL_MIN_VERSION
-        or packaging.version.parse(fresnel.version.version) >= FRESNEL_MAX_VERSION
-    ):
-        warnings.warn(f'Unsupported fresnel version {fresnel.version.version} - expect errors.')
-    
-    L = snapshot.configuration.box[0]
-
-    poly_info = fresnel.util.convex_polyhedron_from_vertices(vertices)
-
-    scene = fresnel.Scene(fresnelDevice)
-    geometry = fresnel.geometry.ConvexPolyhedron(scene, poly_info, N=snapshot.particles.N)
-    geometry.material = fresnel.material.Material(
-            color=fresnel.color.linear([0.74, 0.01, 0.26]), roughness=0.5)
-
-    geometry.position[:] = snapshot.particles.position[:]
-    geometry.orientation[:] = snapshot.particles.orientation[:]
-    geometry.outline_width = 0.01
-    fresnel.geometry.Box(scene, snapshot.configuration.box, box_radius=0.02)
-
-    scene.lights = [
-        fresnel.light.Light(direction=(0, 0, 1), color=(0.8, 0.8, 0.8), theta=math.pi),
-        fresnel.light.Light(
-        direction=(1, 1, 1), color=(1.1, 1.1, 1.1), theta=math.pi / 3)
-    ]
-    scene.camera = fresnel.camera.Orthographic(
-        position=(L * 2, L, L * 2), look_at=(0, 0, 0), up=(0, 1, 0), height=L * 1.4 + 1)
-    
-    scene.background_color = (1, 1, 1)
-    scene.background_alpha = 1
-
-    img = tracer.sample(scene, samples=500)._repr_png_()
-    with open("./outputs/"+str(fName)+".png", "wb") as png:
-        png.write(img)
-
-### End rendering function
-
+import pickle
+import time
 
 def QuaternionToZAxis(q):
     # Convert a quaternion to the z-axis of the rotated frame
-    # Assumes q = [x, y, z, w]
-    x, y, z, w = q
-    return np.array([
-        2 * (x * z + w * y),
-        2 * (y * z - w * x),
-        1 - 2 * (x**2 + y**2)])
+    # Assumes q = [w, x, y, z]
+    w, x, y, z = q
+    return np.array([2 * (x*z + w*y), 2 * (y*z - w*x), 1 - 2 * (x**2 + y**2)])
 
-def quaternion_to_long_axis(q, local_axis=np.array([0, 0, 1])):
-    # Transform the local_axis using the quaternion `q`
-    # HOOMD convention: q = [x, y, z, w] (vector part first)
-    x, y, z, w = q
-    # Rotation matrix derived from quaternion
-    R = np.array([
-        [1 - 2 * (y**2 + z**2), 2 * (x * y - w * z), 2 * (x * z + w * y)],
-        [2 * (x * y + w * z), 1 - 2 * (x**2 + z**2), 2 * (y * z - w * x)],
-        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x**2 + y**2)]
-    ])
-    return R @ local_axis
-
-
-N = 1  # Number of rods
-Lx, Ly, Lz = 10, 10, 10  # Box dimensions
-rodLength = 5.0 
-rodDiameter = 0.5
-velocityMagnitude = 0.1
+N = 1000  # Number of rods
+Lx, Ly, Lz = 20, 20, 20  # Box dimensions
+rodLength = 2.0 
+rodDiameter = 0.25
+velocityMagnitude = 0.05
 timestep = 0.01  
-numSteps = 40  # Number of simulation steps
-numOutputs = 20# Number of simulations steps to output
+numSteps = 20  # Number of simulation steps
+numOutputs = 20  # Number of simulations steps to output
+ranRot = 0.04  # Stochastic rotation
+ranMov = 0.04  # Stochastic translational movement
+output = True
 
 
 # Initialize HOOMD context
 device = hoomd.device.auto_select()
-sim = hoomd.Simulation(device=device, seed=42)
+sim = hoomd.Simulation(device=device, seed=43)
 
 box = hoomd.Box(Lx=Lx, Ly=Ly, Lz=Lz)
 
 # Randomise initial positions and orientations
 positions = np.random.uniform(low=-Lx/2, high=Lx/2, size=(N, 3))
+#positions = np.array([[0,1.5,0],[0,0,-1.5]])
 quaternions = np.random.uniform(-1, 1, size=(N, 4))
+#quaternions = np.array([[1,1,0,0],[1,0,0,0]], dtype='float64')
 
-quaternions = np.array([[1.0,1.0,1.0,1.0]])
 quaternions /= np.linalg.norm(quaternions, axis=1)[:, np.newaxis]  # Normalize to unit quaternions
-
-positions = np.array([[0.0,0.0,0.0]])
 
 
 # Create a snapshot
@@ -139,6 +75,10 @@ for i in range(nCirclePoints):
     vertices.append([x, y, coreLength / 2])
 
 vertices = np.array(vertices)
+
+if (output == True):
+    with open("vertices.board", "wb+") as outFile:
+        pickle.dump(vertices, outFile)
 ### Finish vertices of spherocylinder
 
 
@@ -147,7 +87,6 @@ mc.shape['rod'] = {
     "sweep_radius": radius          # Rounding radius (for the hemispherical caps)
 }
 sim.operations.integrator = mc
-
 
 # Assign velocity along the orientation
 velocities = []
@@ -168,9 +107,9 @@ class ActiveRodUpdater(hoomd.custom.Action):
                 orientations = snapshot.particles.orientation
 
                 # Update positions along the direction vector
-                for i in range(len(positions)):
+                for i in range(N):
                     u = QuaternionToZAxis(orientations[i])
-                    positions[i] += self.velocities[i] * u
+                    positions[i] += u * velocityMagnitude
                     
 # Add the custom updater to the simulation
 active_rod_updater = ActiveRodUpdater(velocities=velocities)
@@ -188,47 +127,31 @@ sim.operations.add(hoomd.update.CustomUpdater(action=active_rod_updater, trigger
 #sim.operations.tuners.append(tune)
 
 # Alternatively change at start
-mc.a['rod'] = 0.0
-mc.d['rod'] = 0.0
-
-
-# Simulate with outputs
-# method is to simply output image very so often to fulfill numOutputs
-if (numOutputs > 0):
-    # Render initial state
-    currentSnapshot = sim.state.get_snapshot()
-    render(currentSnapshot, vertices, fName="out0")
-    if (numOutputs > 1):
-        step = numSteps//(numOutputs-1)
-        for i in range(numOutputs-1):
-            sim.run(step)
-            currentSnapshot = sim.state.get_snapshot()
-            render(currentSnapshot, vertices, fName="out"+str(i+1))
-            print(currentSnapshot.particles.position)
+mc.a['rod'] = ranRot
+mc.d['rod'] = ranMov
 
 # Simulate with saves
 # save gsd file of snapshots then image process later
-#if (numOutputs > 0):
-#    # Write initial state
-#    gsdWriter = hoomd.write.GSD(filename='trajectory.gsd', tigger=hoomd.trigger.periodic(1000), mode='xb')
-#    sim.operations.writers.append(gsdWriter)
+if (output == True):
+    if (numOutputs > 1):
 
+        step = numSteps//(numOutputs)
+        gsdWriter = hoomd.write.GSD(filename='trajectory.gsd', trigger=hoomd.trigger.Periodic(step), mode='wb') # change mode to xb to exclusively create (avoid overwriting)
+        sim.operations.writers.append(gsdWriter)
+
+startTime = time.time()
+
+sim.run(numSteps)
+
+totalTime = time.time() - startTime
+
+print("Simulation time: "+str(totalTime)+"s. \n")
 
 ### Analysis
-print(mc.a['rod'])
-print(mc.d['rod'])
 
-print("Ratio of moves accepted:")
-print(mc.translate_moves[0] / sum(mc.translate_moves))
+print("Ratio of moves accepted: "+str(mc.translate_moves[0] / sum(mc.translate_moves)))
 
-print("Ratio of rotations accepted:")
-print(mc.rotate_moves[0] / sum(mc.rotate_moves))
-
-# Save final configuration:
-#hoomd.write.GSD.write(state=simulation.state, mode='xb', filename='random.gsd')
-
-
-
+print("Ratio of rotations accepted: "+str(mc.rotate_moves[0] / sum(mc.rotate_moves)))
 
 
 
