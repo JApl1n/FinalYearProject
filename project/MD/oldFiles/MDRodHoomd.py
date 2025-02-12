@@ -92,9 +92,9 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 Lx, Ly, Lz = 20, 20, 20  # Size of box dimensions
 dt = 0.005  # Time step
 drivingForceMagnitude = 1.0  # Size of force drving rods forward
-numSolvent = 0  # Number of solvent particles
-numRods = 20  # Number of whole rods
-rodLength = 5  # Number of particles per rod
+numSolvent = 100  # Number of solvent particles
+numRods = 5  # Number of whole rods
+rodLength = 4  # Number of particles per rod
 rodSpacing = 1.0  # Distance between rod particles
 k1 = 100.0  # Stiffness of separation springs between particles
 k2 = 100.0  # Stiffness of alignment springs between particles

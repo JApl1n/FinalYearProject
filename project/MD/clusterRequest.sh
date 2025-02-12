@@ -28,12 +28,9 @@ cd "${SLURM_SUBMIT_DIR}"
 echo "time(s),average\n"
 
 # Submit
-module load openmpi cuda
+module load openmpi/5.0.3 cuda
 source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
-conda activate mpi_hoomd
-
-export OMPI_MCA_orte_precondition_transports="1"
-export OMPI_MCA_btl="^openib"
+conda activate parallel_hoomd
 
 mpirun -n 2 python runSim.py
 # Output the end time

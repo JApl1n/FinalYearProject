@@ -29,10 +29,10 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 # Parameters
 Lx, Ly, Lz = 20, 20, 20  # Box dimensions
-numRods = 5  # Number of rods
+numRods = 3  # Number of rods
 rodLength = 5  # Particles per rod
 rodSpacing = 1.0  # Distance between rod particles
-numSolvent = 20  # Number of solvent particles
+numSolvent = 0  # Number of solvent particles
 
 # Create the initial configuration
 box = hoomd.Box(Lx=Lx, Ly=Ly, Lz=Lz)

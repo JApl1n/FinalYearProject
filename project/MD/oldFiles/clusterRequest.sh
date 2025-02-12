@@ -1,4 +1,4 @@
-#!/bin/bash
+!/bin/bash
 
 #SBATCH --account=CHEM030406
 #SBATCH --job-name=hoomdTest
@@ -28,11 +28,14 @@ cd "${SLURM_SUBMIT_DIR}"
 echo "time(s),average\n"
 
 # Submit
-module load openmpi/5.0.3 cuda
+module load openmpi cuda
 source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 
-mpirun -n 1 python runSim.py
+export OMPI_MCA_orte_precondition_transports="1"
+export OMPI_MCA_btl="^openib"
+
+mpirun -n 2 python runSim.py
 # Output the end time
 #printf "\n\n"
 #echo "Ended on: $(date)"

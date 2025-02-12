@@ -1,5 +1,6 @@
 import hoomd
 import numpy as np
+import json
 
 
 def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
@@ -29,10 +30,16 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 # Parameters
 Lx, Ly, Lz = 20, 20, 20  # Box dimensions
-numRods = 3  # Number of rods
+numRods = 5  # Number of rods
 rodLength = 5  # Particles per rod
-rodSpacing = 1.0  # Distance between rod particles
-numSolvent = 0  # Number of solvent particles
+rodSpacing = 0.5  # Distance between rod particles
+numSolvent = 200  # Number of solvent particles
+
+params = {"Lx": Lx, "Ly": Ly, "Lz": Lz, "numRods": numRods, "rodLength": rodLength, "rodSpacing": rodSpacing, "numSolvent": numSolvent}
+
+with open("simulationMetadata.json", "w") as f:
+    json.dump(params, f, indent=4)
+
 
 # Create the initial configuration
 box = hoomd.Box(Lx=Lx, Ly=Ly, Lz=Lz)
@@ -45,7 +52,6 @@ rodPositions = GenerateRandomRods(numRods, rodLength, Lx, rodSpacing)
 snapshot = hoomd.Snapshot()
 snapshot.particles.N = numSolvent + numRods * rodLength
 snapshot.particles.types = ['solvent', 'rod']
-snapshot.particles.typeid[:] = [0] * numSolvent + [1] * (rodLength * numRods)
 snapshot.particles.position[:] = np.vstack([solventPositions, rodPositions])
 snapshot.configuration.box = [Lx, Ly, Lz, 0, 0, 0]
 
@@ -85,4 +91,4 @@ sim.create_state_from_snapshot(snapshot)
 hoomd.write.GSD.write(state=sim.state, filename="rodsInitial.gsd", mode="wb")
 
 
-print("Initial GSD file 'rodsInitial.gsd' created.")
+print("Initial GSD file 'rodsInitial.gsd' created with metadata file.")
