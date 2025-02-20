@@ -10,11 +10,12 @@ import json
 # This will print the timestep within the simulation after each step in the simulation.
 class PrintTimestep(hoomd.custom.Action):
     def act(self, timestep):
-        print(timestep)
+        if MPI.COMM_WORLD.rank == 0:
+            print(timestep)
 
 # This class allows me to edit and read the positions of particles in the simulation and works with mpi
 class RodPropulsion(hoomd.custom.Action):
-    def __init__(self, numRods, rodLength, numSolvent, boxSizes, forceMagnitude, dt, outstep, outputFilename, communicator):
+    def __init__(self, numRods, rodLength, numSolvent, boxSizes, forceMagnitude, dt, outstep, outputFilename, warmupLength, communicator):
         self._numRods = numRods
         self._rodLength = rodLength
         self._numSolvent = numSolvent
@@ -40,16 +41,16 @@ class RodPropulsion(hoomd.custom.Action):
     # This function writes the types to the start fo the output of positions. This means we can identify which are solvent and which are rods
     def InitHdf5(self, filename, snap, timestep):
         
-        types = "types"
+        datasetName = "metadata"
 
-        localData = {"tags": snap.particles.tag.tolist(), types: snap.particles.typeid.tolist()}
+        localData = {"tags": snap.particles.tag.tolist(), "types": snap.particles.typeid.tolist()}
         allData = self._mpiComm.allgather(localData)
         globalTags = []
         globalTypes = []
 
         for data in allData:
             globalTags.extend(data["tags"])
-            globalTypes.extend(data[types])
+            globalTypes.extend(data["types"])
         allTags = np.array(globalTags)
         allTypes = np.array(globalTypes)
 
@@ -58,79 +59,114 @@ class RodPropulsion(hoomd.custom.Action):
 
         if self._rank == 0:
             with h5py.File(filename, "a") as f:
-                if types in f:
-                    del f[types]
-                f.create_dataset(types, data=sortedTypes)
-
+                if datasetName in f:
+                    del f[datasetName]
+                f.create_dataset(datasetName, data=sortedTypes)
+                
     # This is done to update the force applied to each rod. We cant access forces in this version of hoomd (5.0) so we add velocity instead.
     def act(self, timestep):
         with self._state.cpu_local_snapshot as snap:
             
-            localData = {
-                "positions": snap.particles.position.tolist(),
-                "tags": snap.particles.tag.tolist(),
-                "velocities": snap.particles.velocity.tolist()}
+            localPositions = snap.particles.position[:]
+            localTags = snap.particles.tag[:]
+            localVelocities = snap.particles.velocity[:]
 
-            allData = self._mpiComm.allgather(localData)
+            allData = self._mpiComm.allgather({
+                "positions": localPositions,
+                "tags": localTags,
+                "velocities": localVelocities})
 
-            globalPositions = []
-            globalTags = []
-            globalVelocities = []
-
-            for data in allData:
-                globalPositions.extend(data["positions"])
-                globalTags.extend(data["tags"])
-                globalVelocities.extend(data["velocities"])
-
-            globalPositions = np.array(globalPositions)
-            globalTags = np.array(globalTags)
-            globalVelocities = np.array(globalVelocities)
-
-            for rodNum in range(self._rodStart, self._rodEnd):
-                rodStartTag = self._numSolvent + rodNum * self._rodLength
-                rodEndTag = rodStartTag + self._rodLength
-      
-                rodMask = (globalTags >= rodStartTag) & (globalTags < rodEndTag)
-                rodIndices = np.where(rodMask)[0]
-                                    
-                if len(rodIndices) == 0:
-                    continue  # Skip if no rod particles found
-
-                rodTags = globalTags[rodIndices]
-                sortedOrder = np.argsort(rodTags)
-                rodIndices = rodIndices[sortedOrder]
-                rodTags = rodTags[sortedOrder]
-
-                rodPositions = globalPositions[rodIndices]
-                rodAxis = rodPositions[-1] - rodPositions[0]
-                                    
-
-                for i in range(3):
-                    if rodAxis[i] > self._boxSizes[i] / 2:
-                        rodAxis[i] -= self._boxSizes[i]
-                    elif rodAxis[i] < -self._boxSizes[i] / 2:
-                        rodAxis[i] += self._boxSizes[i]
-
-                rodAxis /= np.linalg.norm(rodAxis)
-
-                # Apply propulsion force along the rod's axis
-                velocityIncrement = self._forceMagnitude * rodAxis*self._dt
-                for i, index in enumerate(rodIndices):
-                    globalVelocities[index] += velocityIncrement
-
-            # Update local velocities
-            if len(globalVelocities) >= len(snap.particles.velocity):
-                snap.particles.velocity[:] = globalVelocities[:len(snap.particles.velocity)]
+        globalPositions = np.concatenate([data["positions"] for data in allData])
+        globalTags = np.concatenate([data["tags"] for data in allData])
+        globalVelocities = np.concatenate([data["velocities"] for data in allData])
             
-            if timestep == 100:
+        sortedIndices = np.argsort(globalTags)
+        sortedGlobalTags = globalTags[sortedIndices]
+        sortedGlobalPositions = globalPositions[sortedIndices]
+        sortedGlobalVelocities = globalVelocities[sortedIndices]
+
+        velocityUpdates = np.zeros_like(sortedGlobalVelocities)
+        
+        for rodNum in range(self._numRods):
+            rodStartTag = self._numSolvent + rodNum * self._rodLength
+            rodEndTag = rodStartTag + self._rodLength
+
+            rodMask = (sortedGlobalTags >= rodStartTag) & (sortedGlobalTags < rodEndTag)
+            rodIndices = np.where(rodMask)[0]
+            
+            if len(rodIndices) == 0:
+                continue  # No particles for this rod
+
+            # (They should already be in sorted order, but we can enforce it)
+            rodTags = sortedGlobalTags[rodIndices]
+            
+            rodPositions = sortedGlobalPositions[rodIndices]
+
+            # Compute the rod axis as the difference between the last and first particle.
+            rodAxis = rodPositions[-1] - rodPositions[0]    
+
+            # Apply periodic boundary corrections (assuming self._boxSizes is [Lx, Ly, Lz])
+            for i in range(3):
+                if rodAxis[i] > self._boxSizes[i] / 2:
+                    rodAxis[i] -= self._boxSizes[i]
+                elif rodAxis[i] < -self._boxSizes[i] / 2:
+                    rodAxis[i] += self._boxSizes[i]
+            # Normalize the axis
+            rodAxis /= np.linalg.norm(rodAxis)
+
+            velocityIncrement = self._forceMagnitude * rodAxis * dt
+
+            # Add this increment to each particle in the rod.
+            for idx in rodIndices:
+                velocityUpdates[idx] += velocityIncrement
+
+        
+        # Now, send the computed updates to the ranks that own each particle.
+        # Build a mapping of tags to owner rank.
+        tagToRank = {}
+        for rank, data in enumerate(allData):
+            for tag in data["tags"]:
+                tagToRank[tag] = rank  # This mapping may change as domains evolve.
+
+        # Prepare the sendData dictionary.
+        sendData = {rank: [] for rank in range(self._mpiComm.size)}
+        for i, tag in enumerate(sortedGlobalTags):
+            ownerRank = tagToRank.get(tag, None)
+            # Only send the update if the owner is different from the current rank.
+            if ownerRank is not None and ownerRank != self._mpiComm.rank:
+                sendData[ownerRank].append((tag, velocityUpdates[i]))
+
+        
+        # Exchange updates with other ranks.
+        # Use sendrecv for each rank that we have updates to exchange.
+        recvData = {rank: [] for rank in range(self._mpiComm.size)}
+        for rank in sendData.keys():
+            if rank == self._mpiComm.rank:
+                continue
+            sendBuffer = sendData[rank]
+            # Exchange updates with rank.
+            recvBuffer = self._mpiComm.sendrecv(sendobj=sendBuffer, dest=rank, source=rank)
+            recvData[rank] = recvBuffer
+
+
+        # Apply received velocity updates to local particles.
+        with self._state.cpu_local_snapshot as snap:
+            localTags = snap.particles.tag[:]  # Local tags on this rank.
+            for rank in recvData:
+                for tag, velUpdate in recvData[rank]:
+                    # Only apply if this rank owns the particle.
+                    if tag in localTags:
+                        localIndex = np.where(localTags == tag)[0][0]
+                        snap.particles.velocity[localIndex] += velUpdate
+                        
+            
+        if timestep == (warmupLength+1):
+            with self._state.cpu_local_snapshot as snap:
                 self.InitHdf5(outputFilename, snap, timestep)
 
-            if self._rank == 0:
-                if timestep % self._outStep == 0:
-                    sortedIndices = np.argsort(globalTags)
-                    sortedPositions = globalPositions[sortedIndices]
-                    PositionLogger.SaveToHdf5(outputFilename, sortedPositions, timestep)
-
+        if self._rank == 0:
+            if timestep % self._outStep == 0:
+                PositionLogger.SaveToHdf5(outputFilename, sortedGlobalPositions, timestep)
 
 # Writes the position of all particles when called by the above function.
 class PositionLogger:
@@ -144,30 +180,41 @@ class PositionLogger:
             # Remove dataset if it already exists (to prevent errors)
             if datasetName in f:
                 del f[datasetName]
+            
 
             f.create_dataset(datasetName, data=positions)
 
 # Edit the LJ force parameters to increase gradually over warmup period
 class LJParameterTuner(hoomd.custom.Action):
-    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps):
+    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps, alpha=0.5):
         self.ljPotential = ljPotential
         self.startEpsilon = startEpsilon
         self.endEpsilon = endEpsilon
         self.totalSteps = totalSteps
+        self.alpha = alpha
         self.step = 0
 
     def act(self, timestep):
-        # Compute new epsilon using a linear ramp
-        fraction = min(self.step / self.totalSteps, 1.0)
-        newEpsilon = self.startEpsilon + fraction * (self.endEpsilon - self.startEpsilon)
+        # Compute new epsilon using an exponential or linear ramp
+        fraction = 1 - np.exp(-self.alpha*self.step/self.totalSteps)
+        #fraction = min(self.step+1/self.totalSteps, 1.0)
 
-        # Update LJ parameters
-        self.ljPotential.params[("solvent", "solvent")]['epsilon'] = newEpsilon
-        self.ljPotential.params[("solvent", "rod")]['epsilon'] = newEpsilon
-        self.ljPotential.params[("rod", "rod")]['epsilon'] = newEpsilon
-
+        for pair in self.ljPotential.params.keys():
+            startEpsilon = self.startEpsilon[pair]
+            endEpsilon = self.endEpsilon[pair]
+            newEpsilon = startEpsilon + fraction * (endEpsilon - startEpsilon)
+            self.ljPotential.params[pair]["epsilon"] = newEpsilon
+        
         # Increase step count
         self.step += 1
+
+
+class VelocityResetter(hoomd.custom.Action):
+    def act(self, timestep):
+        with sim.state.cpu_local_snapshot as snap:
+            snap.particles.velocity[:] = np.zeros_like(snap.particles.velocity)
+
+
 
 # Load data also used by initialiser
 with open("simulationMetadata.json", "r") as f:
@@ -180,13 +227,14 @@ rodLength = params["rodLength"]
 rodSpacing = params["rodSpacing"]
 
 # Parameters to edit here
-dt = 0.005  # Time step
-drivingForceMagnitude = 10  # Magnitude of force driving rods forward
-warmupLength = 100  # Number of timesteps to tune forces to prevent extreme initial velocities
-simLength = 100  # Number of timesteps for run of simulation
-outStep = 10  # Periodicity of output frames
-kBond = 200  # Strength of force between particles in rod
-kAngle = 200  # Strength to keep particles in rod aligned
+dt = 0.0005  # Time step
+dtWarmup = dt / 50
+drivingForceMagnitude = 100  # Magnitude of force driving rods forward
+warmupLength = 200  # Number of timesteps to tune forces to prevent extreme initial velocities
+simLength = 400  # Number of timesteps for run of simulation
+outStep = 50  # Periodicity of output frames
+kBond = 1000  # Strength of force between particles in rod
+kAngle = 1000  # Strength to keep particles in rod aligned
 
 outputFilename = "positions.h5"
 inputFilename = "rodsInitial.gsd"
@@ -207,56 +255,93 @@ harmonicBond.params['rodBond'] = dict(k=kBond, r0=rodSpacing)
 harmonicAngle = hoomd.md.angle.Harmonic()
 harmonicAngle.params['rodAngle'] = dict(k=kAngle, t0=np.pi)
 
-# Define interactions
+
+### WARMUP SEQUENCE
+
+# Define interaction forces at start with desired ending values.
+# The start values are small for warmup to drift particles from each other,
+# then end at larger values for desired inter-particle forces.
+startEpsilons = {
+    ("solvent", "solvent"): 0.00001,
+    ("rod", "solvent"): 0.00005,
+    ("rod", "rod"): 0.0001}
+
+endEpsilons = {
+    ("solvent", "solvent"): 0.1,
+    ("rod", "solvent"): 0.5,
+    ("rod", "rod"): 1}
+
+
 cell = hoomd.md.nlist.Cell(buffer=0.4)
 lj = hoomd.md.pair.LJ(nlist=cell)
-lj.params[("solvent", "solvent")] = dict(epsilon=0.1, sigma=0.5)
-lj.params[("solvent", "rod")] = dict(epsilon=0.5, sigma=0.5)
-lj.params[("rod", "rod")] = dict(epsilon=1.0, sigma=1.0)
+for pair, epsilon in startEpsilons.items():
+    lj.params[pair] = dict(epsilon=epsilon, sigma=1.0)
 lj.r_cut[("solvent", "solvent")] = 1.122
-lj.r_cut[("solvent", "rod")] = 2.5
+lj.r_cut[("rod", "solvent")] = 2.5
 lj.r_cut[("rod", "rod")] = 2.5
 
-# Add some energy to the system
-integrator = hoomd.md.Integrator(dt=dt)
-langevin = hoomd.md.methods.Langevin(kT=1.0, filter=hoomd.filter.All())
-langevin.gamma['solvent'] = 1.0
-langevin.gamma['rod'] = 0.5
-integrator.methods.append(langevin)
+# Start with smaller forces and ramp to desired values
+ljTuner = LJParameterTuner(lj, startEpsilons, endEpsilons, totalSteps=warmupLength)
+ljTuneOperation = hoomd.update.CustomUpdater(action=ljTuner, trigger=hoomd.trigger.Periodic(1)) 
+sim.operations.updaters.append(ljTuneOperation)
 
+
+# Add forces to integrator for system
+integrator = hoomd.md.Integrator(dt=dtWarmup)
 integrator.forces.append(lj)
 integrator.forces.append(harmonicBond)
 integrator.forces.append(harmonicAngle)
 sim.operations.integrator = integrator
 
-# Print the timestep of a simulation after that step, periodically
-printTimestepOperation = hoomd.write.CustomWriter(action=PrintTimestep(), trigger=hoomd.trigger.Periodic(1))
-#sim.operations.writer.append(printTimestepOperation)
+# Add displacement cap
+disCap = hoomd.md.methods.DisplacementCapped(
+        filter=hoomd.filter.All(),
+        maximum_displacement=0.00000001)
+integrator.methods.append(disCap)
 
-# Add thermodynamic properties for tracking desnity in warm up
+# Reset velocities periodically, we couldnt see a velocity cap so this will do.
+resetterAction = VelocityResetter()
+velResetter = hoomd.update.CustomUpdater(action=resetterAction, trigger=hoomd.trigger.Periodic(10))
+sim.operations.updaters.append(velResetter)
+
+# Print the timestep of a simulation after that step, periodically
+printTimestepOperation = hoomd.write.CustomWriter(action=PrintTimestep(), trigger=hoomd.trigger.Periodic(outStep))
+sim.operations.writers.append(printTimestepOperation)
+
+# Add thermodynamic properties for tracking
 thermodynamicProperties = hoomd.md.compute.ThermodynamicQuantities(
     filter=hoomd.filter.All())
 sim.operations.computes.append(thermodynamicProperties)
 
-# Start with smaller forces and ramp to desired values
-startEpsilon = 0.001
-endEpsilon = 0.5
-ljTuner = LJParameterTuner(lj, startEpsilon, endEpsilon, totalSteps=warmupLength)
-ljTuneOperation = hoomd.update.CustomUpdater(action=ljTuner, trigger=hoomd.trigger.Periodic(1)) 
-sim.operations.updaters.append(ljTuneOperation)
 
-# Run warm up
+## Run warm up with increasing lj and minimal displacements
 sim.run(warmupLength)
 
+
+
+### Now forces at full values, remove warming functions and parameters to prepare to run full simulation
+integrator.methods.remove(disCap)
 sim.operations.updaters.remove(ljTuneOperation)
+sim.operations.updaters.remove(velResetter)
+
+with sim.state.cpu_local_snapshot as snap:
+    snap.particles.velocity[:] = np.zeros_like(snap.particles.velocity)
+
+
+
+
+integrator.dt = dt
+#integrator.methods.remove(langevinWarmed)
+langevinNormal = hoomd.md.methods.Langevin(kT=0.05, filter=hoomd.filter.All())
+langevinNormal.gamma['solvent'] = 10
+langevinNormal.gamma['rod'] = 10
+integrator.methods.append(langevinNormal)
 
 # Add custom updater for propulsion
-forceAction = RodPropulsion(numRods, rodLength, numSolvent, [Lx, Ly, Lz], drivingForceMagnitude, dt, outStep, outputFilename, sim.device.communicator)
+forceAction = RodPropulsion(numRods, rodLength, numSolvent, [Lx, Ly, Lz], drivingForceMagnitude, dt, outStep, outputFilename, warmupLength, sim.device.communicator)
 forceOperation = hoomd.update.CustomUpdater(action=forceAction, trigger=hoomd.trigger.Periodic(1))
 sim.operations.updaters.append(forceOperation)
 
-if MPI.COMM_WORLD.rank == 0:
-    print("Equilibration complete. Running main simulation...")
 
 # Add thermodynamic properties for logging then write to h5 file
 logger = hoomd.logging.Logger(categories=["scalar", "sequence"])
@@ -269,6 +354,9 @@ sim.operations.writers.append(hdf5Writer)
 
 
 # Run simulation
+if MPI.COMM_WORLD.rank == 0:
+    print("Equilibration complete. Running main simulation...")
+
 sim.run(simLength)
 
 

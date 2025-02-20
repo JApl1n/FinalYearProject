@@ -14,11 +14,14 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
             # Random orientation
             orientation = np.random.uniform(-1, 1, size=3)
+            # Uncomment this \/ to set to already aligned perfectly
+            #orientation = np.array([1.0,1.0,1.0])
             orientation /= np.linalg.norm(orientation)
 
             # Generate position of particles along rod
             rodPositions = [startPos + i * rodSpacing * orientation for i in range(rodLength)]
             rodPositions = np.array(rodPositions)
+    
 
             # Check if all positions are inside the box
             if np.all((rodPositions >= low) & (rodPositions <= high)):
@@ -30,10 +33,10 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 # Parameters
 Lx, Ly, Lz = 20, 20, 20  # Box dimensions
-numRods = 5  # Number of rods
+numRods = 25  # Number of rods
 rodLength = 5  # Particles per rod
-rodSpacing = 0.5  # Distance between rod particles
-numSolvent = 200  # Number of solvent particles
+rodSpacing = 1.0  # Distance between rod particles
+numSolvent = 200 # Number of solvent particles
 
 params = {"Lx": Lx, "Ly": Ly, "Lz": Lz, "numRods": numRods, "rodLength": rodLength, "rodSpacing": rodSpacing, "numSolvent": numSolvent}
 
@@ -81,7 +84,6 @@ for i in range(numRods):
         angleList.append([startIndex + j, startIndex + j + 1, startIndex + j + 2])
 snapshot.angles.group[:] = angleList
 snapshot.angles.typeid[:] = [0] * len(angleList)
-
 
 device = hoomd.device.CPU()
 sim = hoomd.Simulation(device=device, seed=42)

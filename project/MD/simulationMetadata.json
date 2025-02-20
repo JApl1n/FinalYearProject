@@ -2,8 +2,8 @@
     "Lx": 20,
     "Ly": 20,
     "Lz": 20,
-    "numRods": 5,
+    "numRods": 25,
     "rodLength": 5,
-    "rodSpacing": 0.5,
+    "rodSpacing": 1.0,
     "numSolvent": 200
 }

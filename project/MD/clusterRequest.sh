@@ -4,7 +4,7 @@
 #SBATCH --job-name=hoomdTest
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=1
 #SBATCH --time=0:0:10
 #SBATCH --mem-per-cpu=100M
@@ -32,7 +32,9 @@ module load openmpi/5.0.3 cuda
 source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 
-mpirun -n 2 python runSim.py
+mpirun -n 8 python runSim.py
+python animator.py
+
 # Output the end time
 #printf "\n\n"
 #echo "Ended on: $(date)"
