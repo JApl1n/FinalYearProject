@@ -93,10 +93,9 @@ class RodPropulsion(hoomd.custom.Action):
 
             rodMask = (sortedGlobalTags >= rodStartTag) & (sortedGlobalTags < rodEndTag)
             rodIndices = np.where(rodMask)[0]
-            
+        
             if len(rodIndices) == 0:
                 continue  # No particles for this rod
-
             # (They should already be in sorted order, but we can enforce it)
             rodTags = sortedGlobalTags[rodIndices]
             
@@ -227,14 +226,14 @@ rodLength = params["rodLength"]
 rodSpacing = params["rodSpacing"]
 
 # Parameters to edit here
-dt = 0.0005  # Time step
+dt = 0.00025  # Time step
 dtWarmup = dt / 50
-drivingForceMagnitude = 10  # Magnitude of force driving rods forward
+drivingForceMagnitude = 10 # Magnitude of force driving rods forward
 warmupLength = 200  # Number of timesteps to tune forces to prevent extreme initial velocities
-simLength = 2000  # Number of timesteps for run of simulation
+simLength = 1000  # Number of timesteps for run of simulation
 outStep = 50  # Periodicity of output frames
-kBond = 1000  # Strength of force between particles in rod
-kAngle = 1000  # Strength to keep particles in rod aligned
+kBond = 750  # Strength of force between particles in rod
+kAngle = 500  # Strength to keep particles in rod aligned
 
 outputFilename = "positions.h5"
 inputFilename = "rodsInitial.gsd"
@@ -267,7 +266,7 @@ startEpsilons = {
     ("rod", "rod"): 0.0001}
 
 endEpsilons = {
-    ("solvent", "solvent"): 0.1,
+    ("solvent", "solvent"): 0.5,
     ("rod", "solvent"): 0.5,
     ("rod", "rod"): 1}
 
@@ -332,9 +331,9 @@ with sim.state.cpu_local_snapshot as snap:
 
 integrator.dt = dt
 #integrator.methods.remove(langevinWarmed)
-langevinNormal = hoomd.md.methods.Langevin(kT=0.05, filter=hoomd.filter.All())
-langevinNormal.gamma['solvent'] = 10
-langevinNormal.gamma['rod'] = 10
+langevinNormal = hoomd.md.methods.Langevin(kT=0.01, filter=hoomd.filter.All())
+langevinNormal.gamma['solvent'] = 5
+langevinNormal.gamma['rod'] = 2
 integrator.methods.append(langevinNormal)
 
 # Add custom updater for propulsion

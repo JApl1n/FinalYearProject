@@ -4,7 +4,7 @@
 #SBATCH --job-name=hoomdTest
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
+#SBATCH --ntasks-per-node=16
 #SBATCH --cpus-per-task=1
 #SBATCH --time=0:0:30
 #SBATCH --mem-per-cpu=100M

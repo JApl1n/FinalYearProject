@@ -61,7 +61,8 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, a
     # Assign colors based on the normalized tags
     colours = colourmap(normalisedTypes)
     sizes = normalisedTypes*12 + 4
-    
+
+
     # Scatter plot for positions
     ax.scatter(x, y, z, s=sizes, c=colours, marker="o")
     for rodPositions in allRodPositions:
