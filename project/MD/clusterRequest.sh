@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=1
-#SBATCH --time=0:0:10
+#SBATCH --time=0:0:30
 #SBATCH --mem-per-cpu=100M
 
 ## Direct output to the following files.

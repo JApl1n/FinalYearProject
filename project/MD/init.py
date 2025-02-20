@@ -33,10 +33,10 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 # Parameters
 Lx, Ly, Lz = 20, 20, 20  # Box dimensions
-numRods = 25  # Number of rods
+numRods = 50  # Number of rods
 rodLength = 5  # Particles per rod
 rodSpacing = 1.0  # Distance between rod particles
-numSolvent = 200 # Number of solvent particles
+numSolvent = 500 # Number of solvent particles
 
 params = {"Lx": Lx, "Ly": Ly, "Lz": Lz, "numRods": numRods, "rodLength": rodLength, "rodSpacing": rodSpacing, "numSolvent": numSolvent}
 
