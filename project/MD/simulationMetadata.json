@@ -10,7 +10,7 @@
     "dtWarmup": 5e-06,
     "drivingForceMagnitude": 10,
     "warmupLength": 200,
-    "simLength": 200,
+    "simLength": 1000,
     "outStep": 50,
     "kBond": 750,
     "kAngle": 500,

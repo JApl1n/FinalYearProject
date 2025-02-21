@@ -353,7 +353,6 @@ with sim.state.cpu_local_snapshot as snap:
 
 
 integrator.dt = dt
-#integrator.methods.remove(langevinWarmed)
 langevinNormal = hoomd.md.methods.Langevin(kT=kT, filter=hoomd.filter.All())
 langevinNormal.gamma['solvent'] = gammaSolvent
 langevinNormal.gamma['rod'] = gammaRod
