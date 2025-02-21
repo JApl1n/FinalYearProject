@@ -219,44 +219,21 @@ class VelocityResetter(hoomd.custom.Action):
 with open("simulationMetadata.json", "r") as f:
     params = json.load(f)
 
-# Parameters from initialisation
 Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
 numSolvent = params["numSolvent"]
 numRods = params["numRods"]
 rodLength = params["rodLength"]
 rodSpacing = params["rodSpacing"]
 
-# Parameters editable here, but inherited initially from init.py
-dt = params["dt"]  # Time step
-dtWarmup = params["dtWarmup"]
-drivingForceMagnitude = params["dtWarmup"] # Magnitude of force driving rods forward
-warmupLength = params["warmupLength"]  # Number of timesteps to tune forces to prevent extreme initial velocities
-simLength = params["simLength"]  # Number of timesteps for run of simulation
-outStep = params["outStep"]  # Periodicity of output frames
-kBond = params["kBond"]  # Strength of force between particles in rod
-kAngle = params["kAngle"]  # Strength of force keeping particles in rod aligned
-sigma = params["sigma"]  # Distance over which the leonard jones potential spreads
-kT = params["kT"]  # Initial kinetic energy given to system after warmup
-gammaSolvent = params["gammaSolvent"]  # Slight resistance given to solvent particles
-gammaRod = params["gammaRod"]  # Slight resistance given to rod particles
-
-ssei = params["ssei"]
-rsei = params["rsei"]
-rrei = params["rrei"]
-ssef = params["ssef"]
-rsef = params["rsef"]
-rref = params["rref"]
-
-startEpsilons = {
-    ("solvent", "solvent"): ssei,
-    ("rod", "solvent"): rsei,
-    ("rod", "rod"): rrei}
-endEpsilons = {
-    ("solvent", "solvent"): ssef,
-    ("rod", "solvent"): rsef,
-    ("rod", "rod"): rref}
-
-
+# Parameters to edit here
+dt = 0.00025  # Time step
+dtWarmup = dt / 50
+drivingForceMagnitude = 10 # Magnitude of force driving rods forward
+warmupLength = 200  # Number of timesteps to tune forces to prevent extreme initial velocities
+simLength = 200  # Number of timesteps for run of simulation
+outStep = 50  # Periodicity of output frames
+kBond = 750  # Strength of force between particles in rod
+kAngle = 500  # Strength to keep particles in rod aligned
 
 outputFilename = "positions.h5"
 inputFilename = "rodsInitial.gsd"
@@ -354,9 +331,9 @@ with sim.state.cpu_local_snapshot as snap:
 
 integrator.dt = dt
 #integrator.methods.remove(langevinWarmed)
-langevinNormal = hoomd.md.methods.Langevin(kT=kT, filter=hoomd.filter.All())
-langevinNormal.gamma['solvent'] = gammaSolvent
-langevinNormal.gamma['rod'] = gammaRod
+langevinNormal = hoomd.md.methods.Langevin(kT=0.01, filter=hoomd.filter.All())
+langevinNormal.gamma['solvent'] = 5
+langevinNormal.gamma['rod'] = 2
 integrator.methods.append(langevinNormal)
 
 # Add custom updater for propulsion
