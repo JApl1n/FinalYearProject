@@ -33,7 +33,7 @@ source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 module load openmpi/5.0.3 cuda
 
-python init.py ID=1 runLength=400 numSolvents=100 numRods=30
+python init.py ID=1 simLength=400 numSolvents=50 numRods=20
 mpirun -n 2 python runSim.py ID=1
 python animator.py ID=1
 python analyser.py ID=1

@@ -1,5 +1,0 @@
-time(s),average\n
-srun: error: timeout waiting for task launch, started 0 of 8 tasks
-srun: StepId=11554700.0 aborted before step completely launched.
-srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
-slurmstepd: error: *** JOB 11554700 ON compute068 CANCELLED AT 2025-02-21T16:38:02 DUE TO TIME LIMIT ***

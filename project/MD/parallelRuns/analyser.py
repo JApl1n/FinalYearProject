@@ -56,7 +56,7 @@ def ComputeMSD(allRodPositions):
 def ExtractData(metadataFilename, h5Filename):
     metaName = "metadata"
     with h5py.File(h5Filename, "r") as f:
-        print("Available keys in HDF5 file:", f.keys())
+        #print("Available keys in HDF5 file:", f.keys())
         # Get all available time steps (dataset names)
         timesteps = sorted([int(step.split('_')[-1]) for step in f.keys() if metaName not in step])
 
@@ -120,8 +120,8 @@ def Plot(timesteps, msdValues, S2Values, ID):
     fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9))
     
     plt.show()
-    plt.savefig(f"MSDvsS2{ID}.png")
-
+    plt.savefig(f"outputs/MSDvsS2{ID}.png")
+    plt.close()
 
 
 def ViewLog(logFilename, ID):
@@ -136,13 +136,28 @@ def ViewLog(logFilename, ID):
     plt.plot(timestep, potential_energy)
     plt.xlabel("timestep")
     plt.ylabel("potential energy")
-    plt.savefig(f"outLog{ID}.png")
+    plt.show()
+    plt.savefig(f"outputs/outLog{ID}.png")
+    plt.close()
 
     print(f"Saved figure to outLog{ID}.py")
 
 
 
-def main(metadataFilename, h5Filename, logFilename, ID):
+def SaveData(msdValues, S2Values, correlation, params, filename, ID):
+
+    data = {"msdValues": msdValues.tolist(), 
+            "S2Values": S2Values.tolist(),
+            "correlation": correlation,
+            "params": params,
+            "ID": ID}
+
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+
+def main(metadataFilename, h5Filename, logFilename, outputFilename, ID):
 
     timesteps, params = ExtractData(metadataFilename, h5Filename)
 
@@ -154,6 +169,7 @@ def main(metadataFilename, h5Filename, logFilename, ID):
 
     ViewLog(logFilename, ID)
 
+    SaveData(msdValues, S2Values, correlation, params, outputFilename, ID)
 
 
 inputs = sys.argv
@@ -166,9 +182,10 @@ if (len(inputs) > 1):
             ID = value
 
 # Define input filenames
-metadataFilename = f"simulationMetadata{ID}.json"
-h5Filename = f"positions{ID}.h5"  # HDF5 file containing particle positions
-logFilename = f"log{ID}.h5"
+metadataFilename = f"metadata/simulationMetadata{ID}.json"
+h5Filename = f"positions/positions{ID}.h5"  # HDF5 file containing particle positions
+logFilename = f"logs/log{ID}.h5"
+outputFilename = f"multiSimData/finalData{ID}.json"
 
-main(metadataFilename, h5Filename, logFilename, ID)
+main(metadataFilename, h5Filename, logFilename, outputFilename, ID)
 
