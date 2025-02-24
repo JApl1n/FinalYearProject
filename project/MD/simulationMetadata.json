@@ -2,15 +2,15 @@
     "Lx": 12,
     "Ly": 12,
     "Lz": 12,
-    "numRods": 40,
+    "numRods": 50,
     "rodLength": 5,
     "rodSpacing": 1.0,
-    "numSolvent": 2500,
+    "numSolvents": 1000,
     "dt": 0.00025,
     "dtWarmup": 5e-06,
     "drivingForceMagnitude": 10,
     "warmupLength": 200,
-    "simLength": 1000,
+    "simLength": 200,
     "outStep": 50,
     "kBond": 750,
     "kAngle": 500,
@@ -23,5 +23,6 @@
     "rrei": 0.0001,
     "ssef": 0.5,
     "rsef": 0.5,
-    "rref": 1
+    "rref": 1,
+    "ID": ""
 }

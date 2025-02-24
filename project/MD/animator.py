@@ -4,14 +4,28 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 import os
-
+import sys
 import json
 from scipy.stats import gaussian_kde
+from scipy.spatial.distance import pdist
 
-# orientational order parameter-  use it
-# second order legendre polynomial, find preferred direction 
+
+
+def ComputeMSD(allRodPositions):
+
+    rodParticles = allRodPositions.transpose(0,2,1).reshape(-1,3)
+
+    distances = pdist(rodParticles, metric="euclidean")
+    msd = np.mean(distances**2)
+
+    return msd
+
+
+
 # Calculate entropy of a single frame
-def CalculateEntropy(positions, positionsGrid, shape):
+def CalculateEntropy(allRodPositions, positionsGrid, shape):
+    positions = allRodPositions.transpose(0,2,1).reshape(-1,3)
+
     kde = gaussian_kde(positions.T, bw_method = "scott")
     
     density = kde(positionsGrid).reshape(shape)
@@ -37,7 +51,7 @@ def HeatmapFrame(entropyFlat, xFlat, yFlat, zFlat, vmin, vmax, frameDir, i):
     plt.title(f"Frame {i}")
 
     cbar = plt.colorbar(sc)
-    cbar.set_label("Entropy")
+    cbar.set_label("Relative Probability")
 
     frameFilename = os.path.join(frameDir, f"frame_{i}.png")
     plt.savefig(frameFilename)
@@ -47,9 +61,11 @@ def HeatmapFrame(entropyFlat, xFlat, yFlat, zFlat, vmin, vmax, frameDir, i):
 
 
 # Make a trajectory png for a single frame in 3d
-def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, allRodPositions):
+def TrajFrame(positions, types, frameDir, timestep, colourmap, params, s2, msd, allRodPositions):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
+
+    Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
 
     # Extract x, y, z positions
     x = positions[:, 0]
@@ -60,8 +76,9 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, a
     
     # Assign colors based on the normalized tags
     colours = colourmap(normalisedTypes)
-    sizes = normalisedTypes*12 + 4
-
+    colours[:,3] = (normalisedTypes*0.67)+0.33  # Set alpha values
+    
+    sizes = (normalisedTypes*20)+10
 
     # Scatter plot for positions
     ax.scatter(x, y, z, s=sizes, c=colours, marker="o")
@@ -80,7 +97,7 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, a
                     [xRod[idx], xRod[idx+1]],
                     [yRod[idx], yRod[idx+1]],
                     [zRod[idx], zRod[idx+1]],
-                    linewidth=2, color="black")
+                    linewidth=2, color="black", alpha=0.5)
 
         #ax.plot(rodPositions[0], rodPositions[1], rodPositions[2], linewidth=2, color="black")
 
@@ -94,7 +111,9 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, a
     ax.set_ylabel("Y Position")
     ax.set_zlabel("Z Position")
 
-    ax.set_title(f"Order Parameter: {s2}", size=10)
+    
+
+    ax.set_title(f"Order Parameter: {round(s2, 4)}, MSD: {round(msd, 2)}", size=10)
 
     # Save the current plot as an image
     frameFilename = os.path.join(frameDir, f"frame_{timestep}.png")
@@ -105,11 +124,14 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, Lx, Ly, Lz, s2, a
 
 
 
-def ComputeOrderParameter(positions, numSolvent, numRods, rodLength):
+def ComputeOrderParameter(positions, params):
+    numSolvents, numRods, rodLength = params["numSolvents"], params["numRods"], params["rodLength"]
+
     rodAxes = np.zeros((numRods, 3))
     allRodPositions = np.zeros((numRods, 3, rodLength))
+
     for rodNum in range(numRods):
-        rodStartTag = numSolvent + rodNum * rodLength
+        rodStartTag = numSolvents + rodNum * rodLength
         rodEndTag = rodStartTag + rodLength
 
         rodPositions = positions[rodStartTag:rodEndTag]
@@ -142,22 +164,17 @@ def ExtractData(metadataFilename, h5Filename):
         params = json.load(f)
     f.close()
 
-    Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
-    numSolvent = params["numSolvent"]
-    numRods = params["numRods"]
-    rodLength = params["rodLength"]
-    rodSpacing = params["rodSpacing"]
-
-    return timesteps, types, Lx, Ly, Lz, numSolvent, numRods, rodLength, rodSpacing
+    return timesteps, types, params
 
 
-def Animate(h5Filename, trajGifFilename, hmGifFilename, Lx, Ly, Lz, timesteps, types, numSolvent, numRods, rodLength):
+
+def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params, ID):
     # Open the HDF5 file and read the positions
     f = h5py.File(h5Filename, "r")
     
     # Create a directory to store the individual frames for the GIF
-    trajFrameDir = "trajFrames"
-    hmFrameDir = "hmFrames"
+    trajFrameDir = f"trajFrames{ID}"
+    hmFrameDir = f"hmFrames{ID}"
     if not os.path.exists(trajFrameDir):
         os.makedirs(trajFrameDir)
     if not os.path.exists(hmFrameDir):
@@ -171,7 +188,8 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, Lx, Ly, Lz, timesteps, t
     entropyAllFrames = []
 
     # Initialise grid for use by entropy meatmap
-    gridSize = 2
+    gridSize = 30
+    Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
     gridX, gridY, gridZ = np.meshgrid(
             np.linspace(-Lx/2, Lx/2, gridSize),
             np.linspace(-Ly/2, Ly/2, gridSize),
@@ -186,16 +204,19 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, Lx, Ly, Lz, timesteps, t
         positions = np.array(f[dataset_name][:])         
 
 
-        s2, allRodPositions = ComputeOrderParameter(positions, numSolvent, numRods, rodLength)
+        s2, allRodPositions = ComputeOrderParameter(positions, params)
+        # Compute mean squared distance
+        msd =  ComputeMSD(allRodPositions)
         # Generatre frame for trajectory
-        trajFilename = TrajFrame(positions, types, trajFrameDir, timestep, colourmap, Lx, Ly, Lz, s2, allRodPositions)
+        trajFilename = TrajFrame(positions, types, trajFrameDir, timestep, colourmap, params, s2, msd, allRodPositions)
         # Calculate entropy in 3d grid of the frame
-        entropyAllFrames.append(CalculateEntropy(positions, positionsGrid, gridX.shape))
+        entropyAllFrames.append(CalculateEntropy(allRodPositions, positionsGrid, gridX.shape))
  
 
         # Read the image and append it to the images list
         trajImages.append(Image.open(trajFilename))
-        
+
+
     # Find biggest and largest entropies to use as scale for plotting for entropy heatmap gif
     globalVMin = np.min(entropyAllFrames)
     globalVMax = np.max(entropyAllFrames)
@@ -223,18 +244,29 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, Lx, Ly, Lz, timesteps, t
 
 
 
-def main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename):
+def main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, ID):
 
-    timesteps, types, Lx, Ly, Lz, numSolvent, numRods, rodLength, rodSpacing = ExtractData(metadataFilename, h5Filename)
+    timesteps, types, params = ExtractData(metadataFilename, h5Filename)
 
-    Animate(h5Filename, trajGifFilename, hmGifFilename, Lx, Ly, Lz, timesteps, types, numSolvent, numRods, rodLength)
+    Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params, ID)
+
+
+inputs = sys.argv
+ID = ""  # Default to blank
+
+if (len(inputs) > 1):
+    inp = inputs[1]  # Assume ID given by first argument, ignore rest
+    if ("=" in inp):
+        param, value = inp.split("=")[0], inp.split("=")[1]
+        if (param == "ID"):
+            ID = value
 
 
 # Define input filenames
-metadataFilename = "simulationMetadata.json"
-h5Filename = "positions.h5"  # HDF5 file containing particle positions
-trajGifFilename = "trajectory3d.gif"  # Name of the output GIF file
-hmGifFilename = "heatmap3d.gif"
+metadataFilename = f"simulationMetadata{ID}.json"
+h5Filename = f"positions{ID}.h5"  # HDF5 file containing particle positions
+trajGifFilename = f"trajectory3d{ID}.gif"  # Name of the output GIF file
+hmGifFilename = f"heatmap3d{ID}.gif"
 
-main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename)
+main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, ID)
 

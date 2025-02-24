@@ -4,18 +4,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 import os
-
+import sys
 import json
 from scipy.spatial.distance import pdist
 
 
 
-def ComputeOrderParameter(positions, numSolvent, numRods, rodLength):
+def ComputeOrderParameter(positions, numSolvents, numRods, rodLength):
     rodAxes = np.zeros((numRods, 3))
     allRodPositions = np.zeros((numRods, 3, rodLength))
 
     for rodNum in range(numRods):
-        rodStartTag = numSolvent + rodNum * rodLength
+        rodStartTag = numSolvents + rodNum * rodLength
         rodEndTag = rodStartTag + rodLength
 
         rodPositions = positions[rodStartTag:rodEndTag]
@@ -71,7 +71,7 @@ def ExtractData(metadataFilename, h5Filename):
 
 
 
-def Iterate(h5Filename, trajGifFilename, hmGifFilename, timesteps, params):
+def Iterate(h5Filename, timesteps, params):
     # Open the HDF5 file and read the positions
     f = h5py.File(h5Filename, "r")
     
@@ -85,9 +85,9 @@ def Iterate(h5Filename, trajGifFilename, hmGifFilename, timesteps, params):
         dataset_name = f"step_{timestep}"
         positions = np.array(f[dataset_name][:])         
 
-        [numSolvent, numRods, rodLength] = params["numSolvent"], params["numRods"], params["rodLength"]
+        [numSolvents, numRods, rodLength] = params["numSolvents"], params["numRods"], params["rodLength"]
 
-        S2, P2Values = allRodPositions = ComputeOrderParameter(positions, numSolvent, numRods, rodLength)
+        S2, P2Values, allRodPositions = ComputeOrderParameter(positions, numSolvents, numRods, rodLength)
         msd = ComputeMSD(allRodPositions)
 
         msdValues[index], S2Values[index] = msd, S2
@@ -102,26 +102,29 @@ def Iterate(h5Filename, trajGifFilename, hmGifFilename, timesteps, params):
 
 
 
-def Plot(timesteps, msdValues, S2Values):
+def Plot(timesteps, msdValues, S2Values, ID):
 
-    plt.plot(timesteps, msdValues, color="blue", alpha=0.6)
+    fig, ax1 = plt.subplots()
+
+    ax1.plot(timesteps, msdValues, color="blue", alpha=0.6, label="Mean Squared Distance")
     plt.xlabel("Timestep")
-    plt.ylabel("Mean Squared Displacement")
-    plt.title("MSD over time")
+    plt.ylabel("Mean Squared Displacement", color="blue")
+    ax1.tick_params(axis="y", labelcolor="blue")
+
+    ax2 = ax1.twinx()
+    ax2.plot(timesteps, S2Values, color="red", alpha=0.6, label="Order Parameter")
+    ax2.set_ylabel("Order Parameter", color="red")
+    ax2.tick_params(axis="y", labelcolor="red")
+
+    plt.title("MSD and Order Parameter over Time")
+    fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9))
+    
     plt.show()
-    plt.savefig("MSD.png")
-    plt.close()
-
-    plt.plot(timesteps, S2Values, color="blue", alpha=0.6)
-    plt.xlabel("Timestep")
-    plt.ylabel("Order Parameter")
-    plt.title("Order Parameter over time")
-    plt.show()
-    plt.savefig("S2.png")
+    plt.savefig(f"MSDvsS2{ID}.png")
 
 
 
-def ViewLog(logFilename):
+def ViewLog(logFilename, ID):
 
     hdf5File = h5py.File(name=logFilename, mode="r")
 
@@ -133,31 +136,40 @@ def ViewLog(logFilename):
     plt.plot(timestep, potential_energy)
     plt.xlabel("timestep")
     plt.ylabel("potential energy")
-    plt.savefig("outLog.png")
+    plt.savefig(f"outLog{ID}.png")
 
-    print("Saved figure to outLog.py")
+    print(f"Saved figure to outLog{ID}.py")
 
 
 
-def main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, logFilename):
+def main(metadataFilename, h5Filename, logFilename, ID):
 
     timesteps, params = ExtractData(metadataFilename, h5Filename)
 
-    msdValues, S2Values, correlation= Iterate(h5Filename, trajGifFilename, hmGifFilename, timesteps, params)
+    msdValues, S2Values, correlation = Iterate(h5Filename, timesteps, params)
 
     print(f"Correlation: {correlation}")
 
-    Plot(timesteps, msdValues, S2Values)
+    Plot(timesteps, msdValues, S2Values, ID)
 
-    ViewLog(logFilename)
+    ViewLog(logFilename, ID)
+
+
+inputs = sys.argv
+ID = ""  # Default to blank
+
+if (len(inputs) > 1):
+    inp = inputs[1]  # Assume ID given by first argument, ignore rest
+    if ("=" in inp):
+        param, value = inp.split("=")[0], inp.split("=")[1]
+        if (param == "ID"):
+            ID = value
 
 
 # Define input filenames
-metadataFilename = "simulationMetadata.json"
-h5Filename = "positions.h5"  # HDF5 file containing particle positions
-trajGifFilename = "trajectory3d.gif"  # Name of the output GIF file
-hmGifFilename = "heatmap3d.gif"
-logFilename = "log.h5"
+metadataFilename = f"simulationMetadata{ID}.json"
+h5Filename = f"positions{ID}.h5"  # HDF5 file containing particle positions
+logFilename = f"log{ID}.h5"
 
-main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, logFilename)
+main(metadataFilename, h5Filename, logFilename, ID)
 

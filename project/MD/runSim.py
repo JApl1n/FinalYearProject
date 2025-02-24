@@ -6,6 +6,7 @@ import gsd.hoomd
 import h5py
 import os
 import json
+import sys
 
 # This will print the timestep within the simulation after each step in the simulation.
 class PrintTimestep(hoomd.custom.Action):
@@ -15,10 +16,10 @@ class PrintTimestep(hoomd.custom.Action):
 
 # This class allows me to edit and read the positions of particles in the simulation and works with mpi
 class RodPropulsion(hoomd.custom.Action):
-    def __init__(self, numRods, rodLength, numSolvent, boxSizes, forceMagnitude, dt, outstep, outputFilename, warmupLength, communicator):
+    def __init__(self, numRods, rodLength, numSolvents, boxSizes, forceMagnitude, dt, outstep, outputFilename, warmupLength, communicator):
         self._numRods = numRods
         self._rodLength = rodLength
-        self._numSolvent = numSolvent
+        self._numSolvents = numSolvents
         self._boxSizes = boxSizes
         self._forceMagnitude = forceMagnitude
         self._dt = dt
@@ -88,7 +89,7 @@ class RodPropulsion(hoomd.custom.Action):
         velocityUpdates = np.zeros_like(sortedGlobalVelocities)
         
         for rodNum in range(self._numRods):
-            rodStartTag = self._numSolvent + rodNum * self._rodLength
+            rodStartTag = self._numSolvents + rodNum * self._rodLength
             rodEndTag = rodStartTag + self._rodLength
 
             rodMask = (sortedGlobalTags >= rodStartTag) & (sortedGlobalTags < rodEndTag)
@@ -215,13 +216,25 @@ class VelocityResetter(hoomd.custom.Action):
 
 
 
+inputs = sys.argv
+ID = ""  # Default to blank
+
+if (len(inputs) > 1):
+    inp = inputs[1]  # Assume ID given by first argument, ignore rest
+    if ("=" in inp):
+        param, value = inp.split("=")[0], inp.split("=")[1]
+        if (param == "ID"):
+            ID = value
+
+
+
 # Load data also used by initialiser
-with open("simulationMetadata.json", "r") as f:
+with open(f"simulationMetadata{ID}.json", "r") as f:
     params = json.load(f)
 
 # Parameters from initialisation
 Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
-numSolvent = params["numSolvent"]
+numSolvents = params["numSolvents"]
 numRods = params["numRods"]
 rodLength = params["rodLength"]
 rodSpacing = params["rodSpacing"]
@@ -247,6 +260,8 @@ ssef = params["ssef"]
 rsef = params["rsef"]
 rref = params["rref"]
 
+ID = params["ID"]  # Might as well assign again
+
 startEpsilons = {
     ("solvent", "solvent"): ssei,
     ("rod", "solvent"): rsei,
@@ -258,8 +273,9 @@ endEpsilons = {
 
 
 
-outputFilename = "positions.h5"
-inputFilename = "rodsInitial.gsd"
+
+outputFilename = f"positions{ID}.h5"
+inputFilename = f"rodsInitial{ID}.gsd"
 
 # Remove old output file
 if (MPI.COMM_WORLD.rank == 0) and (os.path.isfile(outputFilename)):
@@ -359,7 +375,7 @@ langevinNormal.gamma['rod'] = gammaRod
 integrator.methods.append(langevinNormal)
 
 # Add custom updater for propulsion
-forceAction = RodPropulsion(numRods, rodLength, numSolvent, [Lx, Ly, Lz], drivingForceMagnitude, dt, outStep, outputFilename, warmupLength, sim.device.communicator)
+forceAction = RodPropulsion(numRods, rodLength, numSolvents, [Lx, Ly, Lz], drivingForceMagnitude, dt, outStep, outputFilename, warmupLength, sim.device.communicator)
 forceOperation = hoomd.update.CustomUpdater(action=forceAction, trigger=hoomd.trigger.Periodic(1))
 sim.operations.updaters.append(forceOperation)
 
@@ -370,7 +386,7 @@ logger.add(thermodynamicProperties)
 logger.add(sim, quantities=["timestep", "walltime"])
 
 hdf5Writer = hoomd.write.HDF5Log(
-    trigger=hoomd.trigger.Periodic(outStep), filename="log.h5", mode="w", logger=logger)
+    trigger=hoomd.trigger.Periodic(outStep), filename=f"log{ID}.h5", mode="w", logger=logger)
 sim.operations.writers.append(hdf5Writer)
 
 

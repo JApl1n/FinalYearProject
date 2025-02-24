@@ -32,12 +32,14 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 
 
+
+
 # Parameters for initialisation
 Lx, Ly, Lz = 12, 12, 12  # Box sizes
-numRods = 40  # Number of rods
+numRods = 25  # Number of rods
 rodLength = 5  # Particles per rod
 rodSpacing = 1.0  # Distance between rod particles
-numSolvent = 2500 # Number of solvent particles
+numSolvents = 100 # Number of solvent particles
 
 # Parameters for simulation
 dt = 0.00025  # Time step
@@ -61,13 +63,44 @@ ssef = 0.5  # solvent solvent epsilon final
 rsef = 0.5  # rod solvent epsilon final
 rref = 1  # rod rod epsilon final
 
-params = {"Lx": Lx, "Ly": Ly, "Lz": Lz, "numRods": numRods, "rodLength": rodLength, "rodSpacing": rodSpacing, "numSolvent": numSolvent, 
+ID = ""  # An identifier able to differentiate between nodes when multiple simulations ran in parallel
+
+params = {"Lx": Lx, "Ly": Ly, "Lz": Lz, "numRods": numRods, "rodLength": rodLength, "rodSpacing": rodSpacing, "numSolvents": numSolvents, 
         "dt": dt, "dtWarmup": dtWarmup, "drivingForceMagnitude": drivingForceMagnitude, "warmupLength": warmupLength, "simLength": simLength, "outStep": outStep, "kBond": kBond, "kAngle": kAngle, "sigma": sigma, "kT": kT, "gammaSolvent": gammaSolvent, "gammaRod": gammaRod,
-        "ssei": ssei, "rsei": rsei, "rrei": rrei, "ssef": ssef, "rsef": rsef, "rref": rref}
+        "ssei": ssei, "rsei": rsei, "rrei": rrei, "ssef": ssef, "rsef": rsef, "rref": rref,
+        "ID": ID} 
 
 
 
-with open("simulationMetadata.json", "w") as f:
+inputs = sys.argv
+
+if (len(inputs) > 1):
+    for inp in inputs[1:]:
+        if ("=" in inp):
+            param, value = inp.split("=")[0], inp.split("=")[1]
+            if param in params:
+                paramType = type(params[param])
+                
+                try:
+                    old = params[param]
+
+                    value = paramType(value)
+                    params[param] = value
+                    exec(f"{param} = {value}")
+                    print(f"Changing default value of {param} from '{old}' to '{value}'.")
+                except ValueError:
+                    print(f"There is a datatype mismatch for {param}. Please enter a value of type {paramType}. Using default vlaue instead.")
+
+            else:
+                print(f"{param} not in available parameters to change, keeping defaults")
+        else:
+            print("Invalid entry: use python init.py {parameter name}={new value} {parameter name}={new value}")
+
+
+
+
+
+with open(f"simulationMetadata{ID}.json", "w") as f:
     json.dump(params, f, indent=4)
 
 
@@ -75,12 +108,12 @@ with open("simulationMetadata.json", "w") as f:
 box = hoomd.Box(Lx=Lx, Ly=Ly, Lz=Lz)
 
 # Generate particle positions
-solventPositions = np.random.uniform(low=-Lx / 2, high=Lx / 2, size=(numSolvent, 3))
+solventPositions = np.random.uniform(low=-Lx / 2, high=Lx / 2, size=(numSolvents, 3))
 rodPositions = GenerateRandomRods(numRods, rodLength, Lx, rodSpacing)
 
 # Create snapshot
 snapshot = hoomd.Snapshot()
-snapshot.particles.N = numSolvent + numRods * rodLength
+snapshot.particles.N = numSolvents + numRods * rodLength
 snapshot.particles.types = ['solvent', 'rod']
 snapshot.particles.position[:] = np.vstack([solventPositions, rodPositions])
 snapshot.configuration.box = [Lx, Ly, Lz, 0, 0, 0]
@@ -91,14 +124,14 @@ snapshot.bonds.N = numRods * (rodLength - 1)
 snapshot.bonds.types = ['rodBond']
 bondList = []
 for i in range(numRods):
-    startIndex = numSolvent + i * rodLength
+    startIndex = numSolvents + i * rodLength
     for j in range(rodLength - 1):
         bondList.append([startIndex + j, startIndex + j + 1])
 snapshot.bonds.group[:] = bondList
 snapshot.bonds.typeid[:] = [0] * len(bondList)
 
 # Update particle types (assign all rod particles the same type)
-snapshot.particles.typeid[:] = [0] * numSolvent + [1] * (rodLength * numRods)
+snapshot.particles.typeid[:] = [0] * numSolvents + [1] * (rodLength * numRods)
 
 
 # Angles
@@ -106,7 +139,7 @@ snapshot.angles.N = numRods * (rodLength - 2)
 snapshot.angles.types = ['rodAngle']
 angleList = []
 for i in range(numRods):
-    startIndex = numSolvent + i * rodLength
+    startIndex = numSolvents + i * rodLength
     for j in range(rodLength - 2):
         angleList.append([startIndex + j, startIndex + j + 1, startIndex + j + 2])
 snapshot.angles.group[:] = angleList
@@ -117,7 +150,7 @@ sim = hoomd.Simulation(device=device, seed=42)
 
 sim.create_state_from_snapshot(snapshot)
 
-hoomd.write.GSD.write(state=sim.state, filename="rodsInitial.gsd", mode="wb")
+hoomd.write.GSD.write(state=sim.state, filename=f"rodsInitial{ID}.gsd", mode="wb")
 
 
-print("Initial GSD file 'rodsInitial.gsd' created with metadata file.")
+print(f"Initial GSD file 'rodsInitial{ID}.gsd' created with metadata file.")
