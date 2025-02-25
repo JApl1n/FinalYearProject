@@ -1,6 +1,8 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D
 from PIL import Image
 import os
@@ -21,14 +23,35 @@ def ComputeMSD(allRodPositions):
     return msd
 
 
+# Extend positions by mirroring across periodic boundaries.
+# This means probability density calculated accounts for periodic boundary conditions
+def ApplyPBC(positions, boxSize):
+    [Lx, Ly, Lz] = boxSize
+    mirroredPositions = [positions]
+    shifts = [-1, 0, 1]  # Shift in each dimension
 
-# Calculate entropy of a single frame
-def CalculateEntropy(allRodPositions, positionsGrid, shape):
+    for dx in shifts:
+        for dy in shifts:
+            for dz in shifts:
+                if dx==dy==dz==0:
+                    continue
+                shiftVector = np.array([dx*Lx, dy*Ly, dz*Lz])
+                mirroredPositions.append(positions + shiftVector)
+
+    return np.vstack(mirroredPositions)
+
+
+
+# Calculate entropy of a single frame. This is related to Shannon entropy, measuring uncertainty or disorder
+# in a probability distribution. We use a discrete approximation of the differential entropy.
+def CalculateEntropy(allRodPositions, positionsGrid, gridShape, boxSize):
     positions = allRodPositions.transpose(0,2,1).reshape(-1,3)
 
-    kde = gaussian_kde(positions.T, bw_method = "scott")
+    extendedPositions = ApplyPBC(positions, boxSize)
+
+    kde = gaussian_kde(extendedPositions.T, bw_method = "scott")
     
-    density = kde(positionsGrid).reshape(shape)
+    density = kde(positionsGrid).reshape(gridShape)
 
     entropy = -density * np.log(density + 1e-10)
     entropy = entropy / np.max(entropy)
@@ -41,17 +64,23 @@ def HeatmapFrame(entropyFlat, xFlat, yFlat, zFlat, vmin, vmax, frameDir, i):
     fig = plt.figure(figsize=(8,8))
     ax = fig.add_subplot(111, projection="3d")
 
-    opacity = np.clip(entropyFlat**2, 0.05, 1)
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    opacity = np.clip((entropyFlat-(entropyFlat.min()*0.7)), 0.01, 0.75)
+    
+    colourmap = plt.cm.inferno
+    colours = colourmap(norm(entropyFlat))
+    colours[:, 3] = opacity
 
-    sc = ax.scatter(xFlat, yFlat, zFlat, c=entropyFlat, cmap="inferno", alpha=opacity, marker="o", s=10, vmin=vmin, vmax=vmax)
-
+    sc = ax.scatter(xFlat, yFlat, zFlat, c=colours,  marker="o", s=10)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
     plt.title(f"Frame {i}")
 
-    cbar = plt.colorbar(sc)
-    cbar.set_label("Relative Probability")
+    sm = cm.ScalarMappable(norm=norm, cmap=colourmap)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label("Relative Shannon Entropy")
 
     frameFilename = os.path.join(frameDir, f"frame_{i}.png")
     plt.savefig(frameFilename)
@@ -210,7 +239,7 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params
         # Generatre frame for trajectory
         trajFilename = TrajFrame(positions, types, trajFrameDir, timestep, colourmap, params, s2, msd, allRodPositions)
         # Calculate entropy in 3d grid of the frame
-        entropyAllFrames.append(CalculateEntropy(allRodPositions, positionsGrid, gridX.shape))
+        entropyAllFrames.append(CalculateEntropy(allRodPositions, positionsGrid, gridX.shape, np.array([Lx, Ly, Lz])))
  
 
         # Read the image and append it to the images list

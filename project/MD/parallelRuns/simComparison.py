@@ -1,6 +1,8 @@
 import os
 import json
 import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 inputFolder = "multiSimData"
@@ -23,6 +25,33 @@ for fileName in os.listdir(inputFolder):
     allCorrelations.append(data["correlation"])
 
 
+# Find differing parameters across simuklations
+paramVals = defaultdict(set)
+ 
+paramLabels = allParams[0].keys()
+for sim in allParams:
+    for key, value in sim.items():
+        paramVals[key].add(value)
 
-print(allParams)
+varyingParams = {key: values for key, values in paramVals.items() if len(values) > 1}
+
+if varyingParams:
+    print("The following parameters vary between simulations:")
+    for key, values in varyingParams.items():
+        print(f"{key}: {values}")
+else:
+    print("All parameters are the same across simulations.")
+
+
+# Plot
+plt.violinplot(allMSDVals)
+plt.xticks(np.arange(1, len(allIDs)+1), labels=allIDs)
+plt.xlabel("ID")
+plt.ylabel("Mean Squared Distance")
+plt.title("How does MSD vary with changing ID")
+plt.show()
+plt.savefig("idk.png")
+plt.close()
+    
+
 
