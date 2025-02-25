@@ -217,7 +217,7 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params
     entropyAllFrames = []
 
     # Initialise grid for use by entropy meatmap
-    gridSize = 30
+    gridSize = 5
     Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
     gridX, gridY, gridZ = np.meshgrid(
             np.linspace(-Lx/2, Lx/2, gridSize),
@@ -294,8 +294,8 @@ if (len(inputs) > 1):
 # Define input filenames
 metadataFilename = f"metadata/simulationMetadata{ID}.json"
 h5Filename = f"positions/positions{ID}.h5"  # HDF5 file containing particle positions
-trajGifFilename = f"outputs/trajectory3d{ID}.gif"  # Name of the output GIF file
-hmGifFilename = f"outputs/heatmap3d{ID}.gif"
+trajGifFilename = f"outGifs/trajectory3d{ID}.gif"  # Name of the output GIF file
+hmGifFilename = f"outGifs/heatmap3d{ID}.gif"
 
 main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, ID)
 

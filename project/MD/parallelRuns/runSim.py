@@ -242,7 +242,7 @@ rodSpacing = params["rodSpacing"]
 # Parameters editable here, but inherited initially from init.py
 dt = params["dt"]  # Time step
 dtWarmup = params["dtWarmup"]
-drivingForceMagnitude = params["dtWarmup"] # Magnitude of force driving rods forward
+drivingForceMagnitude = params["drivingForceMagnitude"] # Magnitude of force driving rods forward
 warmupLength = params["warmupLength"]  # Number of timesteps to tune forces to prevent extreme initial velocities
 simLength = params["simLength"]  # Number of timesteps for run of simulation
 outStep = params["outStep"]  # Periodicity of output frames

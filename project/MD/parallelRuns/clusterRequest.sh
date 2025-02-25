@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=1
-#SBATCH --time=0:20:00
+#SBATCH --time=0:30:00
 #SBATCH --mem-per-cpu=100M
 
 ## Direct output to the following files.
@@ -33,7 +33,7 @@ source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 module load openmpi/5.0.3 cuda
 
-python init.py ID=3 simLength=400 numSolvents=1000 numRods=20
+python init.py ID=3 drivingForceMagnitude=20
 mpirun -n 8 python runSim.py ID=3
 python animator.py ID=3
 python analyser.py ID=3
