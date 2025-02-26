@@ -305,7 +305,7 @@ startEpsilons = {
     ("rod", "rod"): 0.0001}
 
 endEpsilons = {
-    ("solvent", "solvent"): 0.5,
+    ("solvent", "solvent"): 0.1,
     ("rod", "solvent"): 0.5,
     ("rod", "rod"): 1}
 
@@ -314,8 +314,8 @@ cell = hoomd.md.nlist.Cell(buffer=0.4)
 lj = hoomd.md.pair.LJ(nlist=cell)
 for pair, epsilon in startEpsilons.items():
     lj.params[pair] = dict(epsilon=epsilon, sigma=1.0)
-lj.r_cut[("solvent", "solvent")] = 1.122
-lj.r_cut[("rod", "solvent")] = 2.5
+lj.r_cut[("solvent", "solvent")] = 0.5
+lj.r_cut[("rod", "solvent")] = 1.0
 lj.r_cut[("rod", "rod")] = 2.5
 
 # Start with smaller forces and ramp to desired values

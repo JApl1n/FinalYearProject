@@ -217,7 +217,7 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params
     entropyAllFrames = []
 
     # Initialise grid for use by entropy meatmap
-    gridSize = 5
+    gridSize = 30
     Lx, Ly, Lz = params["Lx"], params["Ly"], params["Lz"]
     gridX, gridY, gridZ = np.meshgrid(
             np.linspace(-Lx/2, Lx/2, gridSize),

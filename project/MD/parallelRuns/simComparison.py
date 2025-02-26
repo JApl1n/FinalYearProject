@@ -78,19 +78,22 @@ def Diff(allParams):
 def Plot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, folderName):
     order = np.argsort(allIDs)
 
-    plt.violinplot(allMSDVals[order].T)
-    plt.xticks(np.arange(1, len(allIDs)+1), labels=allIDs[order])
-    plt.xlabel("ID")
-    plt.ylabel("Mean Squared Distance")
-    plt.title("How does MSD vary with changing ID")
+    plt.violinplot(allS2Vals[order].T)
+    plt.xticks(np.arange(1, len(allIDs)+1), labels=np.arange(3,9))
+    plt.xlabel("Rod Length")
+    plt.ylabel("Order Parameter")
+    plt.title("How does the Order Parameter vary with changing Rod Length")
     plt.show()
-    plt.savefig(f"{folderName}/idk.png")
+    plt.savefig(f"{folderName}/simComparison.png")
     plt.close()
 
 
 
 def MSDvsS2(timesteps, msdValues, S2Values, correlation, ID, folderName):
     fig, ax1 = plt.subplots()
+
+    fig.set_figheight(8)
+    fig.set_figwidth(15)
 
     ax1.plot(timesteps, msdValues, color="blue", alpha=0.6, label="Mean Squared Distance")
     plt.xlabel("Timestep")
@@ -103,8 +106,9 @@ def MSDvsS2(timesteps, msdValues, S2Values, correlation, ID, folderName):
     ax2.tick_params(axis="y", labelcolor="red")
 
     plt.title(f"MSD and Order Parameter over Time - Correlation: {round(correlation,4)}")
-    fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9))
+    fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.88))
 
+    plt.grid()
     plt.show()
     plt.savefig(f"{folderName}/MSDvsS2{ID}.png")
     plt.close()
@@ -114,8 +118,10 @@ def MSDvsS2(timesteps, msdValues, S2Values, correlation, ID, folderName):
 def ViewLog(folderName, timestep, quantityValues, quantity, ID):
     
     plt.plot(timestep, quantityValues)
-    plt.xlabel("timestep")
-    plt.ylabel(quantity)
+    plt.xlabel("Timestep")
+    plt.ylabel("Kinetic Energy")
+    plt.title(f"How does kinetic energy evolve for the system over time?")
+    plt.grid()
     plt.show()
     plt.savefig(f"outPngs/outLog{ID}.png")
     plt.close()

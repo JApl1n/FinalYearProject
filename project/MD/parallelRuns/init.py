@@ -35,33 +35,33 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 
 
 # Parameters for initialisation
-Lx, Ly, Lz = 12, 12, 12  # Box sizes
-numRods = 50  # Number of rods
+Lx, Ly, Lz = 16, 16, 16  # Box sizes
+numRods = 100  # Number of rods
 rodLength = 5  # Particles per rod
 rodSpacing = 0.75  # Distance between rod particles
-numSolvents = 2500 # Number of solvent particles
+numSolvents = 4000 # Number of solvent particles
 
 # Parameters for simulation
-dt = 0.00025  # Time step
+dt = 0.000025  # Time step
 dtWarmup = dt / 50
 drivingForceMagnitude = 10 # Magnitude of force driving rods forward
-warmupLength = 200  # Number of timesteps to tune forces to prevent extreme initial velocities
+warmupLength = 1000  # Number of timesteps to tune forces to prevent extreme initial velocities
 simLength = 4000  # Number of timesteps for run of simulation
 outStep = 50  # Periodicity of output frames
 kBond = 1250  # Strength of force between particles in rod
 kAngle = 750  # Strength to keep particles in rod aligned
 sigma = 2.0  # Range over which leonard jones potentials will stretch
-kT = 0.03  # Kinetic energy given to wholes system after warmup
+kT = 0.01  # Kinetic energy given to whole system after warmup
 gammaSolvent = 2.0  # Slight resistance added to solvents
-gammaRod = 1.0  # slight resistance added to rod
+gammaRod = 1.5  # slight resistance added to rod
 
 # Also parameters for simulation, but the strength of leonard jones potentials
 ssei = 0.00001  # solvent solvent epsilon initial
 rsei = 0.00005  # rod solvent epsilon initial
 rrei = 0.0001  # rod rod epsilon initial
-ssef = 0.5  # solvent solvent epsilon final
-rsef = 0.5  # rod solvent epsilon final
-rref = 1  # rod rod epsilon final
+ssef = 0.05  # solvent solvent epsilon final
+rsef = 0.1  # rod solvent epsilon final
+rref = 1.0  # rod rod epsilon final
 
 ID = ""  # An identifier able to differentiate between nodes when multiple simulations ran in parallel
 
