@@ -33,10 +33,10 @@ source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 module load openmpi/5.0.3 cuda
 
-python init.py ID=5 rodLength=8
-mpirun -n 8 python runSim.py ID=5
-python animator.py ID=5
-python analyser.py ID=5
+python init.py ID=9 rodLength=5 numSolvents=0 numRods=250 drivingForceMagnitude=0
+mpirun -n 8 python runSim.py ID=9
+python animator.py ID=9
+python analyser.py ID=9
 
 
 # Output the end time

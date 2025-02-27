@@ -1,0 +1,67 @@
+Running on host compute068.bc4.acrc.priv
+Slurm job ID is 11574507
+This jobs runs on the following machines:
+compute068
+
+Changing default value of ID from '' to '9'.
+Changing default value of rodLength from '5' to '5'.
+Changing default value of numSolvents from '4000' to '0'.
+Changing default value of numRods from '100' to '250'.
+Changing default value of drivingForceMagnitude from '10' to '0'.
+Initial GSD file 'rodsInitial9.gsd' created with metadata file.
+notice(2): Using domain decomposition: n_x = 2 n_y = 2 n_z = 2.
+100
+200
+300
+400
+500
+600
+700
+800
+900
+1000
+Equilibration complete. Running main simulation...
+1100
+1200
+1300
+1400
+1500
+1600
+1700
+1800
+1900
+2000
+2100
+2200
+2300
+2400
+2500
+2600
+2700
+2800
+2900
+3000
+3100
+3200
+3300
+3400
+3500
+3600
+3700
+3800
+3900
+4000
+4100
+4200
+4300
+4400
+4500
+4600
+4700
+4800
+4900
+5000
+Simulation complete. Output saved to positions/positions9.h5.
+Performance: 17.12083871701674 timesteps per second
+GIFs saved as outGifs/trajectory3d9.gif and outGifs/heatmap3d9.gif
+Correlation: 0.7330875088624473

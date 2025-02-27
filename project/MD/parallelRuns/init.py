@@ -42,12 +42,12 @@ rodSpacing = 0.75  # Distance between rod particles
 numSolvents = 4000 # Number of solvent particles
 
 # Parameters for simulation
-dt = 0.000025  # Time step
+dt = 0.00005  # Time step
 dtWarmup = dt / 50
 drivingForceMagnitude = 10 # Magnitude of force driving rods forward
 warmupLength = 1000  # Number of timesteps to tune forces to prevent extreme initial velocities
 simLength = 4000  # Number of timesteps for run of simulation
-outStep = 50  # Periodicity of output frames
+outStep = 100  # Periodicity of output frames
 kBond = 1250  # Strength of force between particles in rod
 kAngle = 750  # Strength to keep particles in rod aligned
 sigma = 2.0  # Range over which leonard jones potentials will stretch
