@@ -186,7 +186,7 @@ class PositionLogger:
 
 # Edit the LJ force parameters to increase gradually over warmup period
 class LJParameterTuner(hoomd.custom.Action):
-    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps, alpha=0.5):
+    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps, alpha=0.2):
         self.ljPotential = ljPotential
         self.startEpsilon = startEpsilon
         self.endEpsilon = endEpsilon
@@ -299,9 +299,9 @@ harmonicAngle.params['rodAngle'] = dict(k=kAngle, t0=np.pi)
 # The start values are small for warmup to drift particles from each other,
 # then end at larger values for desired inter-particle forces.
 startEpsilons = {
-    ("solvent", "solvent"): 0.00001,
-    ("rod", "solvent"): 0.00005,
-    ("rod", "rod"): 0.0001}
+    ("solvent", "solvent"): 0.000001,
+    ("rod", "solvent"): 0.000005,
+    ("rod", "rod"): 0.00001}
 
 endEpsilons = {
     ("solvent", "solvent"): 0.1,

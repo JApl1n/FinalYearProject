@@ -122,7 +122,7 @@ def main(metadataFilename, h5Filename, logFilename, outputFilename, ID):
 
     msdValues, S2Values, correlation = Iterate(h5Filename, timesteps, params)
 
-    print(f"Correlation: {correlation}")
+    print(f"Analyser finished, correlation: {correlation} \n")
     SaveData(msdValues, S2Values, correlation, params, outputFilename, ID)
 
 
