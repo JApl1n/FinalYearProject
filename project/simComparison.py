@@ -74,11 +74,12 @@ def Diff(allParams):
     return(diffKeys, diffVals)
 
 
-
-def Plot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, folderName):
+# Compare MSD or order parameter for all simulations with varying parameter
+def ComparePlot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, folderName):
     order = np.argsort(allIDs)
 
     plt.violinplot(allS2Vals[order].T)
+    # For now im manually editing the labels instead of using the parameter that is being changed and its value
     plt.xticks(np.arange(1, len(allIDs)+1), labels=np.arange(3,9))
     plt.xlabel("Rod Length")
     plt.ylabel("Order Parameter")
@@ -114,19 +115,45 @@ def MSDvsS2(timesteps, msdValues, S2Values, correlation, ID, folderName):
     plt.close()
 
 
-
+# View on ethermodynamic property over time
 def ViewLog(folderName, timestep, quantityValues, quantity, ID):
-    
     plt.plot(timestep, quantityValues)
     plt.xlabel("Timestep")
-    plt.ylabel("Kinetic Energy")
-    plt.title(f"How does kinetic energy evolve for the system over time?")
+    plt.ylabel(quantity)
+    plt.title(f"How does {quantity} evolve for the system over time?")
     plt.grid()
     plt.show()
     plt.savefig(f"outPngs/outLog{ID}.png")
     plt.close()
 
     print(f"Saved figure to outLog{ID}.py")
+
+
+# Compare how two thermodynamic properties evolve over time
+def ViewLogs(folderName, timesteps, quantityValues1, quantityValues2, quantity1, quantity2, ID):
+    
+    fig, ax1 = plt.subplots()
+
+    fig.set_figheight(7)
+    fig.set_figwidth(10)
+
+    ax1.plot(timesteps, quantityValues1, color="blue", alpha=0.6, label=quantity1)
+    plt.xlabel("Timestep")
+    plt.ylabel(quantity1, color="blue")
+    ax1.tick_params(axis="y", labelcolor="blue")
+
+    ax2 = ax1.twinx()
+    ax2.plot(timesteps, quantityValues2, color="red", alpha=0.6, label=quantity2)
+    ax2.set_ylabel(quantity2, color="red")
+    ax2.tick_params(axis="y", labelcolor="red")
+
+    plt.title(f"Evolution of {quantity1} and {quantity2} over time")
+    fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.88))
+
+    plt.grid()
+    plt.show()
+    plt.savefig(f"outPngs/outLog{ID}.png")
+    plt.close()
 
 
 
@@ -136,15 +163,19 @@ def main(inputFolder, logFolder, outputFolder):
     diffKeys, diffVals = Diff(allParams)
 
     #print("Available log quantities: {'kinetic_temperature': 'scalar', 'pressure': 'scalar', 'pressure_tensor': 'sequence', 'kinetic_energy': 'scalar', 'translational_kinetic_energy': 'scalar', 'rotational_kinetic_energy': 'scalar', 'potential_energy': 'scalar', 'degrees_of_freedom': 'scalar', 'translational_degrees_of_freedom': 'scalar', 'rotational_degrees_of_freedom': 'scalar', 'num_particles': 'scalar', 'volume': 'scalar'}")
-    quantity = "kinetic_energy"
-    timesteps, logQuantities = LoadLogs(logFolder, quantity)
-    
-    Plot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, outputFolder)
+    quantity1 = "potential_energy"
+    quantity2 = "kinetic_energy"
+    timesteps, logQuantities1 = LoadLogs(logFolder, quantity1)
+    timesteps, logQuantities2 = LoadLogs(logFolder, quantity2)
+
+    ComparePlot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, outputFolder)
     
     index = 0
     for ID in allIDs:
         MSDvsS2(timesteps[index], allMSDVals[index], allS2Vals[index], allCorrelations[index], ID, outputFolder)
-        ViewLog(outputFolder, timesteps[index], logQuantities[index], quantity, ID)
+
+        ViewLogs(outputFolder, timesteps[index], logQuantities1[index], logQuantities2[index], quantity1, quantity2, ID)
+        #ViewLog(outputFolder, timesteps[index], logQuantities1[index], quantity1, ID)
 
         index += 1
 
