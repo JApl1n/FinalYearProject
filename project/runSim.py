@@ -39,7 +39,7 @@ class RodPropulsion(hoomd.custom.Action):
     def attatch(self, simulation):
         self._state = simulation.state
 
-    # This function writes the types to the start fo the output of positions. This means we can identify which are solvent and which are rods
+    # This function writes the types to the start of the output of positions. This means we can identify which are solvent and which are rods
     def InitHdf5(self, filename, snap, timestep):
         
         datasetName = "metadata"
@@ -64,7 +64,7 @@ class RodPropulsion(hoomd.custom.Action):
                     del f[datasetName]
                 f.create_dataset(datasetName, data=sortedTypes)
                 
-    # This is done to update the force applied to each rod. We cant access forces in this version of hoomd (5.0) so we add velocity instead.
+    # This is done to update the force applied to each rod. We cant access forces in this version of hoomd (5.0) so we add velocity instead. This requires mpi allgathers unfortunately as a rod may be spread across multiple domains. This slows the program down a lot but is necessary.
     def act(self, timestep):
         with self._state.cpu_local_snapshot as snap:
             
@@ -159,11 +159,12 @@ class RodPropulsion(hoomd.custom.Action):
                         localIndex = np.where(localTags == tag)[0][0]
                         snap.particles.velocity[localIndex] += velUpdate
                         
-            
+        # After the warmup is finished, save initial information about the system for later saves
         if timestep == (warmupLength+1):
             with self._state.cpu_local_snapshot as snap:
                 self.InitHdf5(outputFilename, snap, timestep)
 
+        # If outStep many steps have run since the last save, save system positions
         if self._rank == 0:
             if timestep % self._outStep == 0:
                 PositionLogger.SaveToHdf5(outputFilename, sortedGlobalPositions, timestep)
@@ -181,7 +182,6 @@ class PositionLogger:
             if datasetName in f:
                 del f[datasetName]
             
-
             f.create_dataset(datasetName, data=positions)
 
 # Edit the LJ force parameters to increase gradually over warmup period
@@ -229,7 +229,7 @@ if (len(inputs) > 1):
 
 
 # Load data also used by initialiser
-with open(f"simulationMetadata{ID}.json", "r") as f:
+with open(f"metadata/simulationMetadata{ID}.json", "r") as f:
     params = json.load(f)
 
 # Parameters from initialisation
@@ -242,7 +242,7 @@ rodSpacing = params["rodSpacing"]
 # Parameters editable here, but inherited initially from init.py
 dt = params["dt"]  # Time step
 dtWarmup = params["dtWarmup"]
-drivingForceMagnitude = params["dtWarmup"] # Magnitude of force driving rods forward
+drivingForceMagnitude = params["drivingForceMagnitude"] # Magnitude of force driving rods forward
 warmupLength = params["warmupLength"]  # Number of timesteps to tune forces to prevent extreme initial velocities
 simLength = params["simLength"]  # Number of timesteps for run of simulation
 outStep = params["outStep"]  # Periodicity of output frames
@@ -273,9 +273,8 @@ endEpsilons = {
 
 
 
-
-outputFilename = f"positions{ID}.h5"
-inputFilename = f"rodsInitial{ID}.gsd"
+outputFilename = f"positions/positions{ID}.h5"
+inputFilename = f"rodsInitial/rodsInitial{ID}.gsd"
 
 # Remove old output file
 if (MPI.COMM_WORLD.rank == 0) and (os.path.isfile(outputFilename)):
@@ -305,24 +304,24 @@ startEpsilons = {
     ("rod", "rod"): 0.0001}
 
 endEpsilons = {
-    ("solvent", "solvent"): 0.5,
+    ("solvent", "solvent"): 0.1,
     ("rod", "solvent"): 0.5,
     ("rod", "rod"): 1}
 
 
+# Define leonard jones potentials
 cell = hoomd.md.nlist.Cell(buffer=0.4)
 lj = hoomd.md.pair.LJ(nlist=cell)
 for pair, epsilon in startEpsilons.items():
     lj.params[pair] = dict(epsilon=epsilon, sigma=1.0)
-lj.r_cut[("solvent", "solvent")] = 1.122
-lj.r_cut[("rod", "solvent")] = 2.5
+lj.r_cut[("solvent", "solvent")] = 0.5
+lj.r_cut[("rod", "solvent")] = 1.0
 lj.r_cut[("rod", "rod")] = 2.5
 
 # Start with smaller forces and ramp to desired values
 ljTuner = LJParameterTuner(lj, startEpsilons, endEpsilons, totalSteps=warmupLength)
 ljTuneOperation = hoomd.update.CustomUpdater(action=ljTuner, trigger=hoomd.trigger.Periodic(1)) 
 sim.operations.updaters.append(ljTuneOperation)
-
 
 # Add forces to integrator for system
 integrator = hoomd.md.Integrator(dt=dtWarmup)
@@ -337,7 +336,7 @@ disCap = hoomd.md.methods.DisplacementCapped(
         maximum_displacement=0.00000001)
 integrator.methods.append(disCap)
 
-# Reset velocities periodically, we couldnt see a velocity cap so this will do.
+# Reset velocities periodically, hoomd doesnt allow a velocity cap so this will do.
 resetterAction = VelocityResetter()
 velResetter = hoomd.update.CustomUpdater(action=resetterAction, trigger=hoomd.trigger.Periodic(10))
 sim.operations.updaters.append(velResetter)
@@ -350,7 +349,6 @@ sim.operations.writers.append(printTimestepOperation)
 thermodynamicProperties = hoomd.md.compute.ThermodynamicQuantities(
     filter=hoomd.filter.All())
 sim.operations.computes.append(thermodynamicProperties)
-
 
 ## Run warm up with increasing lj and minimal displacements
 sim.run(warmupLength)
@@ -365,9 +363,7 @@ sim.operations.updaters.remove(velResetter)
 with sim.state.cpu_local_snapshot as snap:
     snap.particles.velocity[:] = np.zeros_like(snap.particles.velocity)
 
-
-
-
+# Redefine dt for integrator and add kinetic energy to system after resetting velocites
 integrator.dt = dt
 langevinNormal = hoomd.md.methods.Langevin(kT=kT, filter=hoomd.filter.All())
 langevinNormal.gamma['solvent'] = gammaSolvent
@@ -379,14 +375,13 @@ forceAction = RodPropulsion(numRods, rodLength, numSolvents, [Lx, Ly, Lz], drivi
 forceOperation = hoomd.update.CustomUpdater(action=forceAction, trigger=hoomd.trigger.Periodic(1))
 sim.operations.updaters.append(forceOperation)
 
-
 # Add thermodynamic properties for logging then write to h5 file
 logger = hoomd.logging.Logger(categories=["scalar", "sequence"])
 logger.add(thermodynamicProperties)
 logger.add(sim, quantities=["timestep", "walltime"])
 
 hdf5Writer = hoomd.write.HDF5Log(
-    trigger=hoomd.trigger.Periodic(outStep), filename=f"log{ID}.h5", mode="w", logger=logger)
+    trigger=hoomd.trigger.Periodic(outStep), filename=f"logs/log{ID}.h5", mode="w", logger=logger)
 sim.operations.writers.append(hdf5Writer)
 
 

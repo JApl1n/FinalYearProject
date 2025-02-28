@@ -197,6 +197,7 @@ def ExtractData(metadataFilename, h5Filename):
 
 
 
+# Read all input frames for the simulation, iterates through the timesteps, calculating the order parameter and mean squared distance and entropies for the system and saves them to a frame to be turned into a gif. 
 def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params, ID):
     # Open the HDF5 file and read the positions
     f = h5py.File(h5Filename, "r")

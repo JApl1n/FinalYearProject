@@ -56,7 +56,7 @@ def ComputeMSD(allRodPositions):
 def ExtractData(metadataFilename, h5Filename):
     metaName = "metadata"
     with h5py.File(h5Filename, "r") as f:
-        print("Available keys in HDF5 file:", f.keys())
+        #print("Available keys in HDF5 file:", f.keys())
         # Get all available time steps (dataset names)
         timesteps = sorted([int(step.split('_')[-1]) for step in f.keys() if metaName not in step])
 
@@ -80,12 +80,12 @@ def Iterate(h5Filename, timesteps, params):
 
     index = 0
 
+    [numSolvents, numRods, rodLength] = params["numSolvents"], params["numRods"], params["rodLength"]
+
     for timestep in timesteps:
         # Extract the particle positions for this timestep
         dataset_name = f"step_{timestep}"
         positions = np.array(f[dataset_name][:])         
-
-        [numSolvents, numRods, rodLength] = params["numSolvents"], params["numRods"], params["rodLength"]
 
         S2, P2Values, allRodPositions = ComputeOrderParameter(positions, numSolvents, numRods, rodLength)
         msd = ComputeMSD(allRodPositions)
@@ -102,58 +102,28 @@ def Iterate(h5Filename, timesteps, params):
 
 
 
-def Plot(timesteps, msdValues, S2Values, ID):
 
-    fig, ax1 = plt.subplots()
+def SaveData(msdValues, S2Values, correlation, params, filename, ID):
 
-    ax1.plot(timesteps, msdValues, color="blue", alpha=0.6, label="Mean Squared Distance")
-    plt.xlabel("Timestep")
-    plt.ylabel("Mean Squared Displacement", color="blue")
-    ax1.tick_params(axis="y", labelcolor="blue")
+    data = {"msdValues": msdValues.tolist(), 
+            "S2Values": S2Values.tolist(),
+            "correlation": correlation,
+            "params": params,
+            "ID": ID}
 
-    ax2 = ax1.twinx()
-    ax2.plot(timesteps, S2Values, color="red", alpha=0.6, label="Order Parameter")
-    ax2.set_ylabel("Order Parameter", color="red")
-    ax2.tick_params(axis="y", labelcolor="red")
-
-    plt.title("MSD and Order Parameter over Time")
-    fig.legend(loc="upper left", bbox_to_anchor=(0.1, 0.9))
-    
-    plt.show()
-    plt.savefig(f"MSDvsS2{ID}.png")
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
 
 
 
-def ViewLog(logFilename, ID):
-
-    hdf5File = h5py.File(name=logFilename, mode="r")
-
-    timestep = hdf5File["hoomd-data/Simulation/timestep"][:]
-    potential_energy = hdf5File["hoomd-data/md/compute/ThermodynamicQuantities/potential_energy"][:]
-
-    print("Available quantities: {'kinetic_temperature': 'scalar', 'pressure': 'scalar', 'pressure_tensor': 'sequence', 'kinetic_energy': 'scalar', 'translational_kinetic_energy': 'scalar', 'rotational_kinetic_energy': 'scalar', 'potential_energy': 'scalar', 'degrees_of_freedom': 'scalar', 'translational_degrees_of_freedom': 'scalar', 'rotational_degrees_of_freedom': 'scalar', 'num_particles': 'scalar', 'volume': 'scalar'}")
-
-    plt.plot(timestep, potential_energy)
-    plt.xlabel("timestep")
-    plt.ylabel("potential energy")
-    plt.savefig(f"outLog{ID}.png")
-
-    print(f"Saved figure to outLog{ID}.py")
-
-
-
-def main(metadataFilename, h5Filename, logFilename, ID):
+def main(metadataFilename, h5Filename, logFilename, outputFilename, ID):
 
     timesteps, params = ExtractData(metadataFilename, h5Filename)
 
     msdValues, S2Values, correlation = Iterate(h5Filename, timesteps, params)
 
     print(f"Correlation: {correlation}")
-
-    Plot(timesteps, msdValues, S2Values, ID)
-
-    ViewLog(logFilename, ID)
-
+    SaveData(msdValues, S2Values, correlation, params, outputFilename, ID)
 
 
 inputs = sys.argv
@@ -166,9 +136,10 @@ if (len(inputs) > 1):
             ID = value
 
 # Define input filenames
-metadataFilename = f"simulationMetadata{ID}.json"
-h5Filename = f"positions{ID}.h5"  # HDF5 file containing particle positions
-logFilename = f"log{ID}.h5"
+metadataFilename = f"metadata/simulationMetadata{ID}.json"
+h5Filename = f"positions/positions{ID}.h5"  # HDF5 file containing particle positions
+logFilename = f"logs/log{ID}.h5"
+outputFilename = f"multiSimData/finalData{ID}.json"
 
-main(metadataFilename, h5Filename, logFilename, ID)
+main(metadataFilename, h5Filename, logFilename, outputFilename, ID)
 
