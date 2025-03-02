@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=1
-#SBATCH --time=0:20:00
+#SBATCH --time=0:02:00
 #SBATCH --mem-per-cpu=100M
 
 ## Direct output to the following files.
@@ -19,6 +19,7 @@ cd "${SLURM_SUBMIT_DIR}"
 
 # Record some potentially useful details about the job:
 echo "Running on host $(hostname)"
+echo "In directory $(pwd)"
 #echo "Started on $(date)"
 #echo "Directory is $(pwd)"
 echo "Slurm job ID is ${SLURM_JOBID}"
@@ -33,10 +34,10 @@ source /user/home/kq21278/miniforge3/etc/profile.d/conda.sh
 conda activate parallel_hoomd
 module load openmpi/5.0.3 cuda
 
-python init.py rodLength=5 numSolvents=6000 numRods=5 simLength=1000 outStep=100 ID=0
-mpirun -n 8 python runSim.py ID=0
-python analyser.py ID=0
-python animator.py ID=0
+python init.py numRods=125 ID=5
+mpirun -n 8 python runSim.py ID=5
+python analyser.py ID=5
+python animator.py ID=5
 
 
 # Output the end time

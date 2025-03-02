@@ -67,6 +67,7 @@ def ExtractData(metadataFilename, h5Filename):
         params = json.load(f)
     f.close()
 
+
     return timesteps, params
 
 

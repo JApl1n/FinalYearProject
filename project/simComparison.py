@@ -25,6 +25,7 @@ def LoadData(inputFolder):
         allS2Vals.append(data["S2Values"])
         allCorrelations.append(data["correlation"])
 
+
     allIDs = np.array(allIDs)
     allMSDVals = np.array(allMSDVals)
     allS2Vals = np.array(allS2Vals)
@@ -34,16 +35,32 @@ def LoadData(inputFolder):
     
 
 
-def LoadLogs(inputFolder, quantity):
+def LoadLogs(inputFolder, quantity, IDs):
+    foundIDs = []
     timesteps = []
     quantities = []
+    
 
     for filename in os.listdir(inputFolder):
+        foundIDs.append(filename.split(".")[0][3:])
         hdf5File = h5py.File(name=f"{inputFolder}/{filename}", mode="r")
             
-        timesteps.append(hdf5File["hoomd-data/Simulation/timestep"][:])
+        currentTimesteps = hdf5File["hoomd-data/Simulation/timestep"][:]
+        timesteps.append(currentTimesteps-currentTimesteps.min())
         quantities.append(hdf5File[f"hoomd-data/md/compute/ThermodynamicQuantities/{quantity}"][:])
 
+    # Fixed bug here where the IDs read by reading the logs isnt the same order as everywhere else, so changed them to match here:
+
+    mapper = np.array(IDs, dtype=int)
+    timesteps = np.array(timesteps)
+    quantities = np.array(quantities)
+    timesteps = timesteps[np.argsort(foundIDs)]
+    quantities = quantities[np.argsort(foundIDs)]
+    timesteps = timesteps[mapper]
+    quantities = quantities[mapper]
+
+    
+    
     return(timesteps, quantities)
         
 
@@ -131,7 +148,7 @@ def ViewLog(folderName, timestep, quantityValues, quantity, ID):
 
 # Compare how two thermodynamic properties evolve over time
 def ViewLogs(folderName, timesteps, quantityValues1, quantityValues2, quantity1, quantity2, ID):
-    
+
     fig, ax1 = plt.subplots()
 
     fig.set_figheight(7)
@@ -147,7 +164,7 @@ def ViewLogs(folderName, timesteps, quantityValues1, quantityValues2, quantity1,
     ax2.set_ylabel(quantity2, color="red")
     ax2.tick_params(axis="y", labelcolor="red")
 
-    plt.title(f"Evolution of {quantity1} and {quantity2} over time")
+    plt.title(f"Evolution of {quantity1} and {quantity2} over time ")
     fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.88))
 
     plt.grid()
@@ -165,16 +182,16 @@ def main(inputFolder, logFolder, outputFolder):
     #print("Available log quantities: {'kinetic_temperature': 'scalar', 'pressure': 'scalar', 'pressure_tensor': 'sequence', 'kinetic_energy': 'scalar', 'translational_kinetic_energy': 'scalar', 'rotational_kinetic_energy': 'scalar', 'potential_energy': 'scalar', 'degrees_of_freedom': 'scalar', 'translational_degrees_of_freedom': 'scalar', 'rotational_degrees_of_freedom': 'scalar', 'num_particles': 'scalar', 'volume': 'scalar'}")
     quantity1 = "potential_energy"
     quantity2 = "kinetic_energy"
-    timesteps, logQuantities1 = LoadLogs(logFolder, quantity1)
-    timesteps, logQuantities2 = LoadLogs(logFolder, quantity2)
+    timesteps, logQuantities1 = LoadLogs(logFolder, quantity1, allIDs)
+    timesteps, logQuantities2 = LoadLogs(logFolder, quantity2, allIDs)
 
     ComparePlot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, outputFolder)
     
-    index = 0
-    for ID in allIDs:
-        MSDvsS2(timesteps[index], allMSDVals[index], allS2Vals[index], allCorrelations[index], ID, outputFolder)
+    for index in range(0,len(allIDs)):
+        print(f"ID: {allIDs[index]}, mean: {logQuantities2[index].mean()}, numRods: {allParams[index]["numRods"]}")
+        MSDvsS2(timesteps[index], allMSDVals[index], allS2Vals[index], allCorrelations[index], allIDs[index], outputFolder)
 
-        ViewLogs(outputFolder, timesteps[index], logQuantities1[index], logQuantities2[index], quantity1, quantity2, ID)
+        ViewLogs(outputFolder, timesteps[index], logQuantities1[index], logQuantities2[index], quantity1, quantity2, allIDs[index])
         #ViewLog(outputFolder, timesteps[index], logQuantities1[index], quantity1, ID)
 
         index += 1

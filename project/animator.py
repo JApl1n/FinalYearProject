@@ -273,7 +273,6 @@ def Animate(h5Filename, trajGifFilename, hmGifFilename, timesteps, types, params
 
 
 
-
 def main(metadataFilename, h5Filename, trajGifFilename, hmGifFilename, ID):
 
     timesteps, types, params = ExtractData(metadataFilename, h5Filename)
