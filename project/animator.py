@@ -107,7 +107,7 @@ def TrajFrame(positions, types, frameDir, timestep, colourmap, params, s2, msd, 
     colours = colourmap(normalisedTypes)
     colours[:,3] = (normalisedTypes*0.67)+0.33  # Set alpha values
     
-    sizes = (normalisedTypes*20)+10
+    sizes = (normalisedTypes*0)+150
 
     # Scatter plot for positions
     ax.scatter(x, y, z, s=sizes, c=colours, marker="o")

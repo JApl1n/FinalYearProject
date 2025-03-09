@@ -17,7 +17,7 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
             # Random orientation
             orientation = np.random.uniform(-1, 1, size=3)
             # Uncomment this \/ to set to already aligned perfectly
-            #orientation = np.array([1.0,1.0,1.0])
+            orientation = np.array([1.0,1.0,1.0])
             orientation /= np.linalg.norm(orientation)
 
             # Generate position of particles along rod
@@ -38,32 +38,32 @@ def GenerateRandomRods(numRods, rodLength, boxSize, rodSpacing):
 # The user should give an ID if running multiple simulations at once for comparison.
 
 # Parameters for initialisation
-Lx, Ly, Lz = 16, 16, 16  # Box sizes
-numRods = 5  # Number of rods
+Lx, Ly, Lz = 10, 10, 10  # Box sizes
+numRods = 20  # Number of rods
 rodLength = 5  # Particles per rod
-rodSpacing = 0.75  # Distance between rod particles
-numSolvents = 60 # Number of solvent particles
+rodSpacing = 1.0  # Distance between rod particles
+numSolvents = 0 # Number of solvent particles
 
 # Parameters for simulation
-dt = 0.00005  # Time step
-dtWarmup = dt / 50
-drivingForceMagnitude = 10 # Magnitude of force driving rods forward
-warmupLength = 100  # Number of timesteps to tune forces to prevent extreme initial velocities
-simLength = 100  # Number of timesteps for run of simulation
-outStep = 25  # Periodicity of output frames
-kBond = 1500  # Strength of force between particles in rod
+dt = 0.001  # Time step
+dtWarmup = dt / 10
+drivingForceMagnitude = 0.0  # Magnitude of force driving rods forward
+warmupLength = 100000  # Number of timesteps to tune forces to prevent extreme initial velocities
+simLength = 300000  # Number of timesteps for run of simulation
+outStep = 5000  # Periodicity of output frames
+kBond = 1000  # Strength of force between particles in rod
 kAngle = 1000  # Strength to keep particles in rod aligned
-sigma = 2.0  # Range over which leonard jones potentials will stretch
+sigma = 1.0  # Range over which leonard jones potentials will stretch
 kT = 0.01  # Kinetic energy given to whole system after warmup
-gammaSolvent = 2.0  # Slight resistance added to solvents
-gammaRod = 1.5  # slight resistance added to rod
+gammaSolvent = 0.5  # Slight resistance added to solvents
+gammaRod = 0.0  # slight resistance added to rod
 
 # Also parameters for simulation, but the strength of leonard jones potentials
-ssei = 0.00001  # solvent solvent epsilon initial
-rsei = 0.00005  # rod solvent epsilon initial
-rrei = 0.0001  # rod rod epsilon initial
+ssei = 0.000001  # solvent solvent epsilon initial
+rsei = 0.000005  # rod solvent epsilon initial
+rrei = 0.00001  # rod rod epsilon initial
 ssef = 0.1  # solvent solvent epsilon final
-rsef = 0.2  # rod solvent epsilon final
+rsef = 0.5  # rod solvent epsilon final
 rref = 1.0  # rod rod epsilon final
 
 ID = ""  # An identifier able to differentiate between nodes when multiple simulations ran in parallel

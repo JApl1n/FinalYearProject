@@ -1,0 +1,96 @@
+Running on host compute085.bc4.acrc.priv
+In directory /user/home/kq21278/Year4/project
+Slurm job ID is 11646608
+This jobs runs on the following machines:
+compute085
+
+Changing default value of numRods from '20' to '19'.
+Changing default value of ID from '' to '3'.
+Initial GSD file 'rodsInitial3.gsd' created with metadata file.
+notice(2): Using domain decomposition: n_x = 2 n_y = 2 n_z = 2.
+5000
+10000
+15000
+20000
+25000
+30000
+35000
+40000
+45000
+50000
+55000
+60000
+65000
+70000
+75000
+80000
+85000
+90000
+95000
+100000
+Equilibration complete. Running main simulation...
+105000
+110000
+115000
+120000
+125000
+130000
+135000
+140000
+145000
+150000
+155000
+160000
+165000
+170000
+175000
+180000
+185000
+190000
+195000
+200000
+205000
+210000
+215000
+220000
+225000
+230000
+235000
+240000
+245000
+250000
+255000
+260000
+265000
+270000
+275000
+280000
+285000
+290000
+295000
+300000
+305000
+310000
+315000
+320000
+325000
+330000
+335000
+340000
+345000
+350000
+355000
+360000
+365000
+370000
+375000
+380000
+385000
+390000
+395000
+400000
+Simulation complete. Output saved to positions/positions3.h5.
+Performance: 171.93812706544188 timesteps per second
+Analyser finished, correlation: -0.19849841856395928 
+
+GIFs saved as outGifs/trajectory3d3.gif and outGifs/heatmap3d3.gif

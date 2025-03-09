@@ -97,10 +97,10 @@ def ComparePlot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, folde
 
     plt.violinplot(allS2Vals[order].T)
     # For now im manually editing the labels instead of using the parameter that is being changed and its value
-    plt.xticks(np.arange(1, len(allIDs)+1), labels=np.arange(3,9))
-    plt.xlabel("Rod Length")
+    plt.xticks(np.arange(1, len(allIDs)+1), labels=np.arange(16,21,1))
+    plt.xlabel("numRods")
     plt.ylabel("Order Parameter")
-    plt.title("How does the Order Parameter vary with changing Rod Length")
+    plt.title("How does the Order Parameter vary with changing numRods")
     plt.show()
     plt.savefig(f"{folderName}/simComparison.png")
     plt.close()
@@ -180,7 +180,7 @@ def main(inputFolder, logFolder, outputFolder):
     diffKeys, diffVals = Diff(allParams)
 
     #print("Available log quantities: {'kinetic_temperature': 'scalar', 'pressure': 'scalar', 'pressure_tensor': 'sequence', 'kinetic_energy': 'scalar', 'translational_kinetic_energy': 'scalar', 'rotational_kinetic_energy': 'scalar', 'potential_energy': 'scalar', 'degrees_of_freedom': 'scalar', 'translational_degrees_of_freedom': 'scalar', 'rotational_degrees_of_freedom': 'scalar', 'num_particles': 'scalar', 'volume': 'scalar'}")
-    quantity1 = "potential_energy"
+    quantity1 = "pressure"
     quantity2 = "kinetic_energy"
     timesteps, logQuantities1 = LoadLogs(logFolder, quantity1, allIDs)
     timesteps, logQuantities2 = LoadLogs(logFolder, quantity2, allIDs)
@@ -188,7 +188,6 @@ def main(inputFolder, logFolder, outputFolder):
     ComparePlot(allIDs, allParams, allMSDVals, allS2Vals, allCorrelations, outputFolder)
     
     for index in range(0,len(allIDs)):
-        print(f"ID: {allIDs[index]}, mean: {logQuantities2[index].mean()}, numRods: {allParams[index]["numRods"]}")
         MSDvsS2(timesteps[index], allMSDVals[index], allS2Vals[index], allCorrelations[index], allIDs[index], outputFolder)
 
         ViewLogs(outputFolder, timesteps[index], logQuantities1[index], logQuantities2[index], quantity1, quantity2, allIDs[index])

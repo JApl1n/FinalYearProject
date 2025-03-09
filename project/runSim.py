@@ -186,7 +186,7 @@ class PositionLogger:
 
 # Edit the LJ force parameters to increase gradually over warmup period
 class LJParameterTuner(hoomd.custom.Action):
-    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps, alpha=0.2):
+    def __init__(self, ljPotential, startEpsilon, endEpsilon, totalSteps, alpha=1.0):
         self.ljPotential = ljPotential
         self.startEpsilon = startEpsilon
         self.endEpsilon = endEpsilon
@@ -298,25 +298,16 @@ harmonicAngle.params['rodAngle'] = dict(k=kAngle, t0=np.pi)
 # Define interaction forces at start with desired ending values.
 # The start values are small for warmup to drift particles from each other,
 # then end at larger values for desired inter-particle forces.
-startEpsilons = {
-    ("solvent", "solvent"): 0.000001,
-    ("rod", "solvent"): 0.000005,
-    ("rod", "rod"): 0.00001}
-
-endEpsilons = {
-    ("solvent", "solvent"): 0.1,
-    ("rod", "solvent"): 0.5,
-    ("rod", "rod"): 1}
 
 
 # Define leonard jones potentials
 cell = hoomd.md.nlist.Cell(buffer=0.4)
 lj = hoomd.md.pair.LJ(nlist=cell)
 for pair, epsilon in startEpsilons.items():
-    lj.params[pair] = dict(epsilon=epsilon, sigma=1.0)
-lj.r_cut[("solvent", "solvent")] = 0.5
-lj.r_cut[("rod", "solvent")] = 1.0
-lj.r_cut[("rod", "rod")] = 2.5
+    lj.params[pair] = dict(epsilon=epsilon, sigma=sigma)
+lj.r_cut[("solvent", "solvent")] = 2.0**(1/6)*sigma
+lj.r_cut[("rod", "solvent")] = 2.0**(1/6)*sigma
+lj.r_cut[("rod", "rod")] = 2.0**(1/6)*sigma
 
 # Start with smaller forces and ramp to desired values
 ljTuner = LJParameterTuner(lj, startEpsilons, endEpsilons, totalSteps=warmupLength)
@@ -333,7 +324,7 @@ sim.operations.integrator = integrator
 # Add displacement cap
 disCap = hoomd.md.methods.DisplacementCapped(
         filter=hoomd.filter.All(),
-        maximum_displacement=0.00000001)
+        maximum_displacement=0.0000002)
 integrator.methods.append(disCap)
 
 # Reset velocities periodically, hoomd doesnt allow a velocity cap so this will do.

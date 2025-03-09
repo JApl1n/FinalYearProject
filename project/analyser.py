@@ -32,7 +32,7 @@ def ComputeOrderParameter(positions, numSolvents, numRods, rodLength):
     # Compute cos^2(theta) for each rod
     cosThetaSquared = (rodAxes @ director) ** 2
 
-    # Compute second order polynomial for each rod
+    # Compute second order Legendre polynomial for each rod
     P2Values = (3/2) * cosThetaSquared - 0.5
 
     # Compute overall order parameter
